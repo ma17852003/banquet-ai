@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>宴會指揮官｜投影幕</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@700;900&family=JetBrains+Mono:wght@500;700;800&display=swap">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/regular/style.css">
+<link rel="stylesheet" href="theme.css?v=3">
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+<style>
+  body { overflow: hidden; }
+  .stage { position: relative; z-index: 1; height: 100vh; display: grid; grid-template-columns: 40fr 60fr; gap: 3vw; padding: 3vw 3vw 6vw; }
+  .left { display: flex; flex-direction: column; justify-content: center; min-width: 0; }
+  .right { display: flex; flex-direction: column; min-width: 0; }
+  .k { font-family: var(--font-mono); letter-spacing: .12em; text-transform: uppercase; color: var(--c-muted); font-size: clamp(14px, 1.15vw, 24px); }
+
+  /* 待機：QR */
+  .qrbox { width: min(26vw, 52vh); padding: 1.2vw; background: var(--c-ivory); border-radius: var(--r-panel); }
+  .qrbox svg { display: block; width: 100%; height: auto; }
+  .code { font-family: var(--font-mono); font-weight: 800; font-size: clamp(56px, 6.2vw, 120px); letter-spacing: .15em; line-height: 1; margin-top: 1.5vw; color: var(--text); }
+  .steps { margin-top: 1.2vw; font-size: clamp(18px, 1.5vw, 30px); color: var(--text-dim); }
+  .url { font-family: var(--font-mono); font-size: clamp(12px, .9vw, 18px); color: var(--c-muted); margin-top: .6vw; word-break: break-all; }
+
+  /* 進行中：倒數 */
+  .ctitle { font-family: var(--font-serif); font-weight: 900; font-size: clamp(40px, 4.6vw, 96px); line-height: 1.1; margin-top: .4vw; }
+  .staff { font-size: clamp(16px, 1.4vw, 28px); color: var(--text-dim); margin-top: .4vw; }
+  .count { font-family: var(--font-mono); font-weight: 800; font-size: clamp(96px, 11vw, 220px); line-height: 1; margin-top: 2vw; font-variant-numeric: tabular-nums; }
+  .count.warn { color: var(--wrong); }
+  .count.paused { opacity: .45; }
+  .bar { height: 10px; background: var(--line); border-radius: 5px; overflow: hidden; margin-top: 1.2vw; }
+  .bar i { display: block; height: 100%; background: var(--c-ivory-dim); transform-origin: left; }
+  .bar.warn i { background: var(--wrong); }
+
+  /* 排行榜 */
+  .lb-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 1vw; }
+  .lb-head h2 { font-family: var(--font-serif); font-size: clamp(26px, 2.4vw, 48px); }
+  .lb { list-style: none; display: grid; gap: .7vw; }
+  .row { display: grid; grid-template-columns: 3.2vw 1fr auto auto; align-items: center; gap: 1.2vw;
+         padding: .9vw 1.2vw; border-radius: var(--r-panel); background: var(--panel); position: relative; will-change: transform; }
+  .row .rk { font-family: var(--font-mono); font-weight: 800; font-size: clamp(22px, 2.2vw, 44px); color: var(--c-muted); }
+  .row .nm { display: flex; align-items: center; gap: .8vw; font-size: clamp(22px, 2vw, 40px); font-weight: 700; min-width: 0; }
+  .row .nm .shape { width: clamp(22px, 2vw, 40px); height: clamp(22px, 2vw, 40px); }
+  .row .cells { display: flex; gap: .4vw; }
+  .row .cells span { width: clamp(14px, 1.3vw, 26px); height: clamp(14px, 1.3vw, 26px); border-radius: 4px; border: 2px solid var(--line); }
+  .row .cells span.on { background: var(--c-ivory-dim); border-color: var(--c-ivory-dim); }
+  .row .cells span.soon { border-style: dashed; opacity: .5; }
+  .row .tot { font-family: var(--font-mono); font-weight: 800; font-size: clamp(34px, 3.3vw, 64px); color: var(--gold-text); min-width: 4ch; text-align: right; font-variant-numeric: tabular-nums; }
+  .row .stripe { position: absolute; left: 0; top: 14%; bottom: 14%; width: 6px; border-radius: 3px; }
+  .row .up { position: absolute; left: 1.2vw; top: -.6vw; font-family: var(--font-mono); font-size: clamp(12px, .9vw, 18px); font-weight: 700;
+             color: var(--c-navy-900); background: var(--c-gold); border-radius: var(--r-pill); padding: 2px 10px; animation: upfade 2.6s forwards; }
+  @keyframes upfade { 0%,75% { opacity: 1; } 100% { opacity: 0; } }
+  .empty { color: var(--c-muted); font-size: clamp(20px, 1.6vw, 32px); padding: 2vw 0; }
+
+  /* 收單 */
+  .closing { position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; background: rgba(10,20,38,.92);
+             font-family: var(--font-serif); font-weight: 900; font-size: clamp(80px, 10vw, 200px); color: var(--c-ivory); }
+  [data-theme="light"] .closing { background: rgba(245,239,225,.94); color: var(--c-navy-900); }
+
+  /* 老師控制列（投影時可按 H 隱藏）*/
+  .ctrl { position: fixed; left: 3vw; right: 3vw; bottom: 1.2vw; z-index: 60; display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+          opacity: .55; transition: opacity var(--t-ui); }
+  .ctrl:hover, .ctrl:focus-within { opacity: 1; }
+  .ctrl button { min-height: 40px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel);
+                 font-size: 14px; display: inline-flex; align-items: center; gap: 6px; }
+  .ctrl button[aria-pressed="true"] { border-color: var(--c-ivory-dim); }
+  .ctrl .sep { flex: 1; }
+  .ctrl.hidden { display: none; }
+  .conn { font-size: 13px; color: var(--c-muted); display: inline-flex; align-items: center; gap: 6px; }
+  .conn.bad { color: var(--wrong); }
+</style>
+</head>
+<body>
+<div class="stage">
+  <section class="left" id="left"></section>
+  <section class="right">
+    <div class="lb-head"><h2>即時排行</h2><span class="k" id="meta"></span></div>
+    <ol class="lb" id="lb" aria-label="即時排行榜"></ol>
+  </section>
+</div>
+
+<div class="ctrl" id="ctrl">
+  <button id="bQR"><i class="ph ph-qr-code"></i>入場 QR（0）</button>
+  <span id="courseBtns" style="display:contents"></span>
+  <button id="bPlus"><i class="ph ph-plus"></i>30 秒（+）</button>
+  <button id="bPause"><i class="ph ph-pause"></i>暫停（空白鍵）</button>
+  <span class="sep"></span>
+  <span class="conn" id="conn"><i class="ph ph-check"></i>連線中</span>
+  <button id="bTheme" aria-pressed="false"><i class="ph ph-sun"></i>燈亮模式（L）</button>
+  <button id="bSound" aria-pressed="false"><i class="ph ph-speaker-slash"></i>音效（M）</button>
+  <button id="bHide">隱藏控制列（H）</button>
+</div>
+
+<script src="game-data.js?v=3"></script>
+<script src="common.js?v=3"></script>
+<script>
+(function () {
+  const $ = s => document.querySelector(s);
+  const pad = n => String(n).padStart(2, "0");
+  const RM = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const PLAY = GAME.courses.filter(c => c.kind !== "soon");
+
+  // 場次碼：網址沒帶就產生一組 4 位數並寫回網址（重新整理不會換碼）
+  const qs = new URLSearchParams(location.search);
+  let session = (qs.get("s") || "").replace(/\D/g, "").slice(0, 4);
+  if (session.length !== 4) {
+    session = String(Math.floor(1000 + Math.random() * 9000));
+    qs.set("s", session); history.replaceState(null, "", "?" + qs.toString());
+  }
+  const studentURL = new URL("index.html?s=" + session, location.href).href;
+  $("#meta").textContent = "場次 " + session;
+
+  // ── 左側：待機 QR／關卡倒數 ──
+  let cd = null; // { course, end, total, paused, remain }
+  function showLobby() {
+    cd = null;
+    const qr = qrcode(0, "M"); qr.addData(studentURL); qr.make();
+    const svg = qr.createSvgTag(6, 0).replace(/ width="\d+px"/, "").replace(/ height="\d+px"/, "");
+    $("#left").innerHTML = `<div class="k">掃碼入座</div>
+      <div class="qrbox" style="margin-top:1vw">${svg}</div>
+      <div class="code" aria-label="場次碼 ${session.split("").join(" ")}">${session}</div>
+      <div class="steps">手機掃 QR → 選你們的桌 → 輸入場次碼</div>
+      <div class="url">${BQ.esc(studentURL)}</div>`;
+  }
+  function startCourse(no) {
+    const c = GAME.courses.find(x => x.no === no);
+    cd = { course: c, total: c.seconds, end: Date.now() + c.seconds * 1000, paused: false, remain: c.seconds * 1000, closed: false };
+    $("#left").innerHTML = `<div class="k">COURSE ${pad(c.no)} · ${c.dish}</div>
+      <div class="ctitle">${c.title}</div>
+      <div class="staff">出任務的是 AI ${c.staff}</div>
+      <div class="count" id="count" role="timer"></div>
+      <div class="bar" id="pbar"><i></i></div>`;
+    tick();
+  }
+  function tick() {
+    if (!cd) return;
+    const remain = cd.paused ? cd.remain : Math.max(0, cd.end - Date.now());
+    const s = Math.ceil(remain / 1000);
+    const el = $("#count"); if (!el) return;
+    el.textContent = `${Math.floor(s / 60)}:${pad(s % 60)}`;
+    el.classList.toggle("warn", s <= 30); el.classList.toggle("paused", cd.paused);
+    $("#pbar").classList.toggle("warn", s <= 30);
+    $("#pbar i").style.transform = `scaleX(${remain / (cd.total * 1000)})`;
+    if (s <= 0 && !cd.closed) { cd.closed = true; closing(); }
+  }
+  setInterval(tick, 250);
+  function closing() {
+    tone(220, .5, "triangle");
+    const el = document.createElement("div"); el.className = "closing"; el.textContent = "收單";
+    document.body.appendChild(el); setTimeout(() => el.remove(), 1400);
+  }
+
+  // ── 右側：排行榜（資料沒變就不動畫面；有變才用 FLIP 換位置）──
+  const rows = new Map(); let lastJSON = "", lastRank = {}, lastTotal = {};
+  function cellsHTML(levels) {
+    return GAME.courses.map(c => c.kind === "soon" ? `<span class="soon"></span>` : `<span class="${levels[c.no] != null ? "on" : ""}"></span>`).join("");
+  }
+  function render(board) {
+    const json = JSON.stringify(board);
+    if (json === lastJSON) return;
+    lastJSON = json;
+    const lb = $("#lb");
+    if (!board.length) { lb.innerHTML = `<li class="empty">等各桌出第一道菜…</li>`; rows.clear(); return; }
+    const empty = lb.querySelector(".empty"); if (empty) empty.remove();
+    const before = new Map(); rows.forEach((el, k) => before.set(k, el.getBoundingClientRect().top));
+    let gained = false, overtook = false;
+    board.forEach((b, i) => {
+      const key = String(b.team), t = BQ.team(b.team);
+      if (!t) return;
+      let el = rows.get(key);
+      if (!el) { el = document.createElement("li"); el.className = "row"; rows.set(key, el); }
+      el.setAttribute("aria-label", `第 ${i + 1} 名，${BQ.teamLabel(b.team)}，${b.total} 分`);
+      el.innerHTML = `<span class="stripe" style="background:${t.color}"></span><span class="rk">${i + 1}</span>
+        <span class="nm">${BQ.shapeSVG(t)}<span>${BQ.teamLabel(b.team)}</span></span>
+        <span class="cells" aria-hidden="true">${cellsHTML(b.levels)}</span><span class="tot">${b.total}</span>`;
+      if (lastRank[key] != null && i < lastRank[key]) {
+        overtook = true;
+        const up = document.createElement("span"); up.className = "up"; up.textContent = "↑ 反超"; el.appendChild(up);
+      }
+      if (lastTotal[key] != null && b.total > lastTotal[key]) gained = true;
+      if (lastTotal[key] == null && b.total > 0) gained = true;
+      lastRank[key] = i; lastTotal[key] = b.total;
+      lb.appendChild(el);
+    });
+    if (!RM) rows.forEach((el, k) => {
+      const old = before.get(k); if (old == null) return;
+      const dy = old - el.getBoundingClientRect().top;
+      if (dy) el.animate([{ transform: `translateY(${dy}px)` }, { transform: "translateY(0)" }],
+                         { duration: 1200, easing: "cubic-bezier(0.16,1,0.3,1)", delay: 60 * lastRank[k] });
+    });
+    if (overtook) { tone(1320, .35); setTimeout(() => tone(1320, .35), 180); } else if (gained) tone(1320, .5);
+  }
+  async function poll() {
+    const board = await BQ.fetchBoard(session);
+    const conn = $("#conn");
+    if (board) { conn.className = "conn"; conn.innerHTML = `<i class="ph ph-check"></i>連線中`; render(board); }
+    else { conn.className = "conn bad"; conn.innerHTML = `<i class="ph ph-x"></i>連不到計分伺服器（檢查 n8n 與 tunnel）`; }
+  }
+  poll(); setInterval(poll, 3000);
+
+  // ── 音效：服務鈴，用 Web Audio 即時合成（要先按一次「音效」才會響，瀏覽器規定）──
+  let ac = null, soundOn = false;
+  function tone(freq, dur, type) {
+    if (!soundOn || !ac) return;
+    const o = ac.createOscillator(), g = ac.createGain(), t = ac.currentTime;
+    o.type = type || "sine"; o.frequency.value = freq; o.connect(g); g.connect(ac.destination);
+    g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(.25, t + .01); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+    o.start(t); o.stop(t + dur + .05);
+  }
+
+  // ── 老師控制 ──
+  PLAY.forEach(c => {
+    const b = document.createElement("button");
+    b.innerHTML = `<i class="ph ph-${c.icon}"></i>第 ${c.no} 道 ${c.title}（${c.no}）`;
+    b.onclick = () => startCourse(c.no);
+    $("#courseBtns").appendChild(b);
+  });
+  const plus = () => { if (!cd) return; if (cd.paused) cd.remain += 30000; else cd.end += 30000; cd.total += 30; cd.closed = false; tick(); };
+  const pause = () => {
+    if (!cd) return;
+    if (cd.paused) { cd.end = Date.now() + cd.remain; cd.paused = false; $("#bPause").innerHTML = `<i class="ph ph-pause"></i>暫停（空白鍵）`; }
+    else { cd.remain = Math.max(0, cd.end - Date.now()); cd.paused = true; $("#bPause").innerHTML = `<i class="ph ph-play"></i>繼續（空白鍵）`; }
+    tick();
+  };
+  const theme = () => {
+    const light = document.documentElement.dataset.theme !== "light";
+    document.documentElement.dataset.theme = light ? "light" : "dark";
+    $("#bTheme").setAttribute("aria-pressed", String(light)); BQ.store.set("bq-theme", light ? "light" : "dark");
+  };
+  const sound = () => {
+    soundOn = !soundOn;
+    if (soundOn && !ac) { try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { soundOn = false; } }
+    $("#bSound").setAttribute("aria-pressed", String(soundOn));
+    $("#bSound").innerHTML = `<i class="ph ph-speaker-${soundOn ? "high" : "slash"}"></i>音效${soundOn ? "開" : "關"}（M）`;
+    if (soundOn) tone(1320, .4);
+  };
+  const hide = () => $("#ctrl").classList.toggle("hidden");
+  $("#bQR").onclick = showLobby; $("#bPlus").onclick = plus; $("#bPause").onclick = pause;
+  $("#bTheme").onclick = theme; $("#bSound").onclick = sound; $("#bHide").onclick = hide;
+  document.addEventListener("keydown", e => {
+    if (e.target.tagName === "INPUT") return;
+    const k = e.key.toLowerCase();
+    if (k === "0") showLobby();
+    else if (PLAY.some(c => String(c.no) === k)) startCourse(Number(k));
+    else if (k === "+" || k === "=") plus();
+    else if (k === " ") { e.preventDefault(); pause(); }
+    else if (k === "l") theme();
+    else if (k === "m") sound();
+    else if (k === "h") hide();
+  });
+
+  if (BQ.store.get("bq-theme", "dark") === "light") theme();
+  showLobby();
+})();
+</script>
+</body>
+</html>
