@@ -50,5 +50,24 @@
   };
   const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
-  window.BQ = { shapeSVG, team, teamLabel, submitScore, fetchBoard, store, esc };
+  // ── 計分（純函式，tests/game.test.js 會測）──
+  // 答對率決定一切；剩餘時間只放大答對的部分（亂交卷拿不到時間分）；連擊加分含在 100 分上限內
+  function courseScore(acc, timeFrac, bonus) {
+    return Math.min(100, Math.round(acc * (70 + 30 * timeFrac)) + (bonus || 0));
+  }
+  // 第 3 道：踩一個陷阱的代價＝漏選兩張，全選不能拿分
+  function costAcc(selected, cards) {
+    const hidden = cards.filter(c => c.hidden).length;
+    const hits = selected.filter(i => cards[i].hidden).length;
+    const traps = selected.length - hits;
+    return Math.max(0, hits - 2 * traps) / hidden;
+  }
+  // 第 5 道：第 3 次連續答對起每題 +2，最多 +10；答錯連擊歸零，已得加分保留
+  function comboStep(s, correct) {
+    if (!correct) return { streak: 0, bonus: s.bonus };
+    const streak = s.streak + 1;
+    return { streak, bonus: streak >= 3 ? Math.min(10, s.bonus + 2) : s.bonus };
+  }
+
+  window.BQ = { shapeSVG, team, teamLabel, submitScore, fetchBoard, store, esc, courseScore, costAcc, comboStep };
 })();
