@@ -9,16 +9,21 @@
   const esc = BQ.esc;
   const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
   const vibrate = () => { try { navigator.vibrate && navigator.vibrate(12); } catch (e) {} };
+  const BRAND = "James Wu｜AI 造王者";
 
   // ── 狀態：誰（場次＋桌）與各道成績，存在本機 ──
   let S = BQ.store.get("bq-who", {});
   const qs = new URLSearchParams(location.search);
   if (qs.get("s")) S.session = qs.get("s").replace(/\D/g, "").slice(0, 4);
   let R = {};
-  const resKey = () => `bq-res-${S.session}-${S.team}`;
+  const resKey = () => `bq-res8-${S.session}-${S.team}`;   // v8 起 6 道重新編號，舊的 bq-res- 存檔不再讀
   const loadRes = () => { R = (S.session && S.team) ? BQ.store.get(resKey(), {}) : {}; };
   const saveRes = () => BQ.store.set(resKey(), R);
   const totalScore = () => Object.values(R).reduce((a, r) => a + (r.score || 0), 0);
+  // 哪幾道已經上完課（存本機）；沒上完課不能練習
+  const teachKey = () => `bq-teach-${S.session}-${S.team}`;
+  const TEACH = () => BQ.store.get(teachKey(), []);
+  const markTaught = n => { const t = TEACH(); if (!t.includes(n)) { t.push(n); BQ.store.set(teachKey(), t); } };
 
   // ── 計時 ──
   let timer = null;
@@ -72,7 +77,8 @@
       <div class="kicker" style="margin-top:20px">選你們的桌</div>
       <div class="tables-pick">${GAME.teams.map(t => `<button class="seat-card" data-t="${t.no}" aria-pressed="${pick === t.no}">${BQ.shapeSVG(t, 26)}<span><small>TABLE ${pad(t.no)} · 第 ${t.no} 桌</small><b style="font-size:18px">${t.name}</b></span></button>`).join("")}</div>
       <label class="kicker" for="code">輸入投影幕上的 4 位數場次碼</label>
-      <input id="code" class="code-input" inputmode="numeric" maxlength="4" autocomplete="off" value="${esc(S.session || "")}">`;
+      <input id="code" class="code-input" inputmode="numeric" maxlength="4" autocomplete="off" value="${esc(S.session || "")}">
+      <p class="brand">業師 ${BRAND}・中小企業 AI 轉型專家</p>`;
     setBar(`<button class="btn-serve" id="go" disabled>入座</button>`);
     const go = $("#go"), code = $("#code");
     const check = () => {
@@ -98,7 +104,8 @@
       const name = `<span class="name">${c.title}<small>${c.dish} · AI ${c.staff}</small></span>`;
       if (c.kind === "soon") return `<li><div class="course soon">${num}${name}<span class="st"><i class="ph ph-lock-simple" aria-label="下次開放"></i></span></div></li>`;
       if (r) return `<li><button class="course done" data-c="${c.no}" aria-label="${c.title}，已完成，${r.score} 分">${num}${name}<span class="st">${r.score}</span></button></li>`;
-      return `<li><button class="course" data-c="${c.no}">${num}${name}<span class="go">開始</span></button></li>`;
+      const taught = TEACH().includes(c.no);
+      return `<li><button class="course" data-c="${c.no}"${taught ? ` aria-label="${c.title}，已上課，可以練習"` : ""}>${num}${name}<span class="go">${taught ? '<i class="ph ph-check" aria-hidden="true"></i>已上課・練習' : "上課"}</span></button></li>`;
     }).join("");
     const unsynced = Object.keys(R).filter(k => !R[k].synced);
     main.innerHTML = `
@@ -107,8 +114,12 @@
         <div style="font-size:14px;color:var(--c-ink-muted)">${esc(GAME.scenario.title)}</div></div>
         <ol>${items}</ol></div>
       ${unsynced.length ? `<p class="sync bad"><i class="ph ph-arrow-counter-clockwise"></i>有 ${unsynced.length} 道分數還沒送到投影幕 <button class="btn-ghost" id="resync">重送</button></p>` : ""}
-      <p style="text-align:center;margin-top:16px"><button class="btn-ghost" id="swap">換桌／換場次</button></p>`;
-    main.querySelectorAll("button.course").forEach(b => b.onclick = () => { const n = Number(b.dataset.c); R[n] ? renderResult(n, false) : renderIntro(n); });
+      <p style="text-align:center;margin-top:16px"><button class="btn-ghost" id="swap">換桌／換場次</button></p>
+      <p class="brand">業師 ${BRAND}</p>`;
+    main.querySelectorAll("button.course").forEach(b => b.onclick = () => {
+      const n = Number(b.dataset.c);
+      if (R[n]) renderResult(n, false); else if (TEACH().includes(n)) renderIntro(n); else renderTeach(n, 0);
+    });
     $("#swap").onclick = renderEntry;
     if (unsynced.length) $("#resync").onclick = async () => {
       for (const k of unsynced) await sync(Number(k));
@@ -116,8 +127,167 @@
     };
     const allDone = PLAYABLE.every(n => R[n]);
     setBar(allDone ? `<button class="btn-serve" id="fin"><i class="ph ph-trophy"></i>看成果卡</button>`
-                   : `<p class="hint">點一道菜開始，${PLAYABLE.length} 道都完成就能領成果卡</p>`);
+                   : `<p class="hint">每道菜先上課、再練習，${PLAYABLE.length} 道都完成就能領成果卡</p>`);
     if (allDone) $("#fin").onclick = renderFinal;
+  }
+
+  // ── 白話上課（每道練習前）：翻卡／開關／先猜再揭曉／配對 ──
+  const fmtMin = m => m < 1 ? "30 秒" : `${m} 分鐘`;
+  const HINT = { flip: "全部點開才能下一步", toggle: "把開關全部打開", guess: "先選一個答案", match: "全部配對正確才能下一步" };
+  function renderTeach(n, i) {
+    const c = C(n), sc = c.teach[i], last = i === c.teach.length - 1;
+    stopTimer(); renderHud(); main.className = ""; main.scrollTop = 0;
+    main.innerHTML = `
+      <div class="kicker">COURSE ${pad(n)} · 白話上課 ${i + 1}/${c.teach.length} · 約 ${fmtMin(sc.mins)}</div>
+      <div class="tprog" aria-hidden="true">${c.teach.map((_, k) => `<span class="${k < i ? "done" : k === i ? "on" : ""}"></span>`).join("")}</div>
+      <h2 class="title">${esc(sc.title)}</h2>
+      ${sc.intro ? `<p class="lead tintro">${esc(sc.intro)}</p>` : ""}
+      <div id="tbody"></div>`;
+    let ok = false;
+    function nextBtn() {
+      const b = $("#next"); b.disabled = !ok;
+      b.innerHTML = ok ? (last ? '<i class="ph ph-play"></i>上完課了，開始練習' : "下一步") : HINT[sc.type];
+    }
+    setBar(`<button class="btn-ghost" id="back">${i ? "上一步" : "菜單"}</button><button class="btn-serve" id="next" style="flex:1"></button>`);
+    $("#back").onclick = () => i ? renderTeach(n, i - 1) : renderMenu();
+    $("#next").onclick = () => { if (!ok) return; if (last) { markTaught(n); renderIntro(n); } else renderTeach(n, i + 1); };
+    nextBtn();
+    const done = () => { if (ok) return; ok = true; nextBtn(); };
+    ({ flip: tFlip, toggle: tToggle, guess: tGuess, match: tMatch })[sc.type](sc, $("#tbody"), done);
+  }
+  const scrollNear = el => { if (el) el.scrollIntoView({ behavior: RM ? "auto" : "smooth", block: "nearest" }); };
+
+  // 翻卡：全部點開才揭曉名稱（先體驗、後命名）；只改被點的那張，不重畫整頁
+  function tFlip(sc, el, done) {
+    const opened = new Set();
+    el.innerHTML = `<p class="kicker tcount" id="tcount">已點開 0 / ${sc.cards.length}</p>
+      <div class="fcards">${sc.cards.map((x, k) => `<button class="fcard" data-k="${k}" aria-expanded="false">
+        <span class="fh"><i class="ph ph-${x.icon}" aria-hidden="true"></i><b>${esc(x.label)}</b>${x.zh ? `<small>${esc(x.zh)}</small>` : ""}<span class="tap">點我</span></span>
+        <span class="fb" hidden><span class="frow2"><span class="tagl">比喻</span>${esc(x.analogy)}</span><span class="frow2"><span class="tagl">宴會裡</span>${esc(x.example)}</span></span>
+      </button>`).join("")}</div><div id="treveal"></div>`;
+    el.querySelectorAll(".fcard").forEach(b => b.onclick = () => {
+      const k = Number(b.dataset.k); if (opened.has(k)) return;
+      opened.add(k); b.classList.add("open"); b.setAttribute("aria-expanded", "true");
+      b.querySelector(".fb").hidden = false; b.querySelector(".tap").remove();
+      $("#tcount").textContent = `已點開 ${opened.size} / ${sc.cards.length}`;
+      if (opened.size === sc.cards.length) {
+        $("#treveal").innerHTML = `<div class="reveal"><div class="kicker">全部點開了，揭曉</div><b>${esc(sc.reveal.title)}</b><p>${esc(sc.reveal.text)}</p></div>`;
+        scrollNear($("#treveal")); done();
+      }
+    });
+  }
+
+  // 開關：一顆顆打開看結果變好；全開之後也能再關掉一顆（破壞實驗）
+  function tToggle(sc, el, done) {
+    const on = sc.parts.map(() => false);
+    const sep = sc.parts.every(p => /[，。]$/.test(p.say)) ? "" : "、";
+    el.innerHTML = `<div class="switches">${sc.parts.map((p, k) => `<button class="sw" role="switch" aria-checked="false" data-k="${k}"><span class="knob" aria-hidden="true"></span>${esc(p.label)}</button>`).join("")}</div>
+      <div class="ticket say"><p><span class="lead2">${esc(sc.lead)}</span><span id="said"></span></p></div>
+      <div class="results" id="res"></div><div id="tdone" aria-live="polite"></div>`;
+    function upd() {
+      const says = sc.parts.filter((_, k) => on[k]).map(p => p.say);
+      $("#said").textContent = says.length ? says.join(sep) : "……";
+      $("#res").innerHTML = sc.parts.map((p, k) => `<div class="rrow ${on[k] ? "on" : "off"}">${esc(on[k] ? p.on : p.off)}</div>`).join("");
+      const all = on.every(Boolean);
+      $("#tdone").innerHTML = all ? `<div class="reveal"><b>${esc(sc.done)}</b></div>` : "";
+      if (all) done();
+    }
+    el.querySelectorAll(".sw").forEach(b => b.onclick = () => {
+      const k = Number(b.dataset.k); on[k] = !on[k];
+      b.setAttribute("aria-checked", String(on[k])); b.classList.toggle("is-on", on[k]); upd();
+    });
+    upd();
+  }
+
+  // 先猜再揭曉：一般題猜錯也算完成（重點是先預測）；quiz 題要答對才過
+  function tGuess(sc, el, done) {
+    el.innerHTML = `${sc.doc ? `<div class="ticket gdoc"><div class="no">AI OUTPUT</div><p>${esc(sc.doc)}</p></div>` : ""}
+      <p class="gq">${esc(sc.question)}</p>
+      <div class="gopts">${sc.options.map((o, k) => `<button class="gopt" data-k="${k}">${esc(o)}</button>`).join("")}</div>
+      <div id="gout" aria-live="polite"></div>`;
+    let settled = false;
+    el.querySelectorAll(".gopt").forEach(b => b.onclick = () => {
+      if (settled) return;
+      const k = Number(b.dataset.k), right = k === sc.answer;
+      if (sc.quiz && !right) {
+        b.disabled = true; b.classList.add("ng");
+        $("#gout").innerHTML = `<p class="gres ng"><i class="ph ph-x" aria-hidden="true"></i>不是這個，再想想</p>`;
+        return;
+      }
+      settled = true;
+      el.querySelectorAll(".gopt").forEach(x => { x.disabled = true; });
+      b.classList.add(right ? "ok" : "ng");
+      el.querySelector(`.gopt[data-k="${sc.answer}"]`).classList.add("ok");
+      const head = right ? `<p class="gres ok"><i class="ph ph-check" aria-hidden="true"></i>答對了</p>`
+                         : `<p class="gres ng"><i class="ph ph-x" aria-hidden="true"></i>正解是「${esc(sc.options[sc.answer])}」</p>`;
+      const tail = `<div class="reveal"><p>${esc(sc.explain)}</p></div>`;
+      if (!sc.checkout) { $("#gout").innerHTML = head + tail; scrollNear($("#gout")); done(); return; }
+      // 結帳明細一行一行跳出來，合計跟著往上加
+      $("#gout").innerHTML = head + `<div class="ticket receipt"><div class="no">結帳明細</div><div id="rlines"></div><div class="brow sum"><span>合計</span><b class="mono" id="rsum">NT$0</b></div></div>`;
+      let k2 = 0, sum = 0;
+      (function step() {
+        if (!el.isConnected) return;   // 動畫中離開這一頁：停止
+        if (k2 >= sc.checkout.length) { $("#gout").insertAdjacentHTML("beforeend", tail); scrollNear($("#gout")); done(); return; }
+        const x = sc.checkout[k2++]; sum += x.amount;
+        $("#rlines").insertAdjacentHTML("beforeend", `<div class="brow"><span>${esc(x.label)}</span><b class="mono">${nt(x.amount)}</b></div>`);
+        $("#rsum").textContent = nt(sum);
+        setTimeout(step, RM ? 0 : 450);
+      })();
+    });
+  }
+
+  // 配對：先點一項、再點它屬於的格子；點錯可以重試，全部配對正確才過
+  function tMatch(sc, el, done) {
+    const placed = {}; let armed = null;
+    const order = shuffle(sc.items.map((_, i) => i));
+    el.innerHTML = `<div class="mitems" id="mitems"></div>
+      <div class="mtargets" id="mtargets">${sc.targets.map(t => `<button class="mt" data-t="${t.id}"><b>${esc(t.label)}</b><span class="mp" data-for="${t.id}"></span></button>`).join("")}</div>
+      <p class="verdict" id="mv" aria-live="polite"></p>`;
+    function drawItems() {
+      const pool = order.filter(i => placed[i] == null);
+      $("#mitems").innerHTML = pool.length
+        ? pool.map(i => `<button class="ticket mitem ${armed === i ? "armed" : ""}" data-i="${i}" aria-pressed="${armed === i}">${esc(sc.items[i].text)}</button>`).join("")
+        : `<p class="alldone">全部配對完成</p>`;
+      $("#mtargets").classList.toggle("armed-mode", armed != null);
+      el.querySelectorAll(".mitem").forEach(b => b.onclick = () => { const i = Number(b.dataset.i); armed = armed === i ? null : i; drawItems(); });
+    }
+    el.querySelectorAll(".mt").forEach(b => b.onclick = () => {
+      if (armed == null) { toast("先點上面的一項，再點格子"); return; }
+      const it = sc.items[armed], mv = $("#mv");
+      if (it.ans === b.dataset.t) {
+        placed[armed] = b.dataset.t; vibrate();
+        b.querySelector(".mp").insertAdjacentHTML("beforeend", `<span class="mchip"><i class="ph ph-check" aria-hidden="true"></i>${esc(it.text.replace(/[「」]/g, "").slice(0, 12))}</span>`);
+        mv.className = "verdict ok"; mv.innerHTML = `<i class="ph ph-check" aria-hidden="true"></i>答對：${esc(it.why)}`;
+        armed = null; drawItems();
+        if (Object.keys(placed).length === sc.items.length) done();
+      } else {
+        mv.className = "verdict ng"; mv.innerHTML = `<i class="ph ph-x" aria-hidden="true"></i>不是這一格，再試一次`;
+        b.classList.remove("shake"); void b.offsetWidth; b.classList.add("shake");
+      }
+    });
+    drawItems();
+  }
+
+  // ── 生圖提示詞組裝器（邀請函那道結算後：學生用自己的 AI 生圖）──
+  function builderHTML(b) {
+    return `<div class="take builder"><div class="kicker">${esc(b.title)}</div>
+      ${b.groups.map(g => `<div class="bg"><span class="bgl">${esc(g.label)}</span><div class="chips">${g.options.map((o, oi) =>
+        `<button class="chipbtn" data-g="${g.key}" data-o="${oi}" aria-pressed="${oi === 0}">${esc(o)}</button>`).join("")}</div></div>`).join("")}
+      <div class="ticket" id="bprompt"></div>
+      <div class="acts"><button class="btn-ghost" id="copyImg"><i class="ph ph-copy"></i>複製生圖提示詞</button><a class="btn-ghost" href="https://gemini.google.com/" target="_blank" rel="noopener">開 Gemini 生圖</a></div>
+      <p class="hint2">生好之後，分組 PK 時把手機上的邀請函秀給大家看。</p></div>`;
+  }
+  function wireBuilder(b) {
+    const sel = {}; b.groups.forEach(g => { sel[g.key] = 0; });
+    const text = () => b.groups.reduce((t, g) => t.split(`{${g.key}}`).join(g.options[sel[g.key]]), b.template);
+    const fill = () => { $("#bprompt").textContent = text(); };
+    document.querySelectorAll(".chipbtn").forEach(x => x.onclick = () => {
+      sel[x.dataset.g] = Number(x.dataset.o);
+      document.querySelectorAll(`.chipbtn[data-g="${x.dataset.g}"]`).forEach(y => y.setAttribute("aria-pressed", String(y === x)));
+      fill();
+    });
+    $("#copyImg").onclick = () => copyText(text());
+    fill();
   }
 
   // ── 關卡開場：員工證（第二條規則依關卡不同）──
@@ -139,7 +309,8 @@
         <div><i class="ph ph-check"></i><span>${RULE[c.kind] || RULE.default}</span></div></div>`;
     setBar(`<button class="btn-ghost" id="back">菜單</button><button class="btn-serve" id="start" style="flex:1"><i class="ph ph-play"></i>開始</button>`);
     $("#back").onclick = renderMenu;
-    $("#start").onclick = () => ({ prompt: playPrompt, spot: playSpot, cost: playCost, seat: playSeat, sort: playSort })[c.kind](c);
+    const shownAt = Date.now();   // 防連點：上一頁的按鈕跟「開始」在同一個位置
+    $("#start").onclick = () => { if (Date.now() - shownAt < 400) return; ({ prompt: playPrompt, spot: playSpot, cost: playCost, seat: playSeat, sort: playSort })[c.kind](c); };
   }
 
   // ── 結算：公式在 common.js 的 BQ.courseScore（有測試）──
@@ -168,7 +339,7 @@
       const left = c.slots.filter(s => picks[s.key] == null).length;
       const s = c.slots[active];
       main.innerHTML = `
-        <div class="kicker">COURSE 01 · 組出一句提示詞給 AI 企劃員</div>
+        <div class="kicker">COURSE ${pad(c.no)} · 組出一句提示詞給 AI 企劃員</div>
         <div class="meter" aria-hidden="true">${c.slots.map(x => `<span class="${picks[x.key] != null ? "on" : ""}"></span>`).join("")}</div>
         <div class="slots">${c.slots.map((x, i) => `<button class="slot ${i === active ? "active" : ""}" data-i="${i}">
             <span class="lab">${x.en}<b>${x.label}</b></span>
@@ -188,7 +359,7 @@
     function submit() {
       if (done) return; done = true;
       const sum = c.slots.reduce((a, s) => a + (picks[s.key] != null ? s.options[picks[s.key]].pts : 0), 0);
-      finish(1, sum / 100, { acc: sum / 100 }, { picks: Object.assign({}, picks), prompt: buildPrompt(c, picks) });
+      finish(c.no, sum / 100, { acc: sum / 100 }, { picks: Object.assign({}, picks), prompt: buildPrompt(c, picks) });
     }
     draw(); startTimer(c.seconds, submit);
   }
@@ -198,7 +369,10 @@
   }
   function bestPicks(c) { const p = {}; c.slots.forEach(s => { p[s.key] = s.options.findIndex(o => o.pts === 25); }); return p; }
 
-  // ── 第 2 道：AI 企劃找碴（標記次數有限，不能整份亂點）──
+  // 中英對照的句子（用「｜」分隔）分兩行顯示，英文小一號
+  const lineHTML = t => { const [zh, en] = String(t).split("｜"); return esc(zh) + (en ? `<span class="en">${esc(en)}</span>` : ""); };
+
+  // ── 找碴（第 2 道企劃書、第 4 道邀請函共用；標記次數有限，不能整份亂點）──
   function playSpot(c) {
     renderHud(); main.className = "fixed";
     const total = c.lines.filter(l => l.wrong).length;
@@ -206,9 +380,9 @@
     main.innerHTML = `
       <div class="spotbar"><span class="dots" id="dots" role="img" aria-label="找到 0 / ${total}">${"<span></span>".repeat(total)}</span>
         <span class="kicker" id="marks">標記剩 ${c.markLimit} 次</span></div>
-      <div class="ticket plan"><div class="no">AI OUTPUT · DRAFT</div><h3>宴會企劃書（初稿）</h3>
+      <div class="ticket plan ${c.docStyle || ""}"><div class="no">${c.docKicker}</div><h3>${c.docTitle}</h3>
         <div style="font-size:13px;color:var(--c-ink-muted);margin-bottom:8px;line-height:1.5">${esc(GAME.scenario.title)}<br>賓客：${esc(GAME.scenario.guests)}</div>
-        ${c.lines.map((l, i) => `<button class="line" data-i="${i}"><span class="mark"></span><span class="hl">${esc(l.text)}</span><span class="note"></span></button>`).join("")}
+        ${c.lines.map((l, i) => `<button class="line" data-i="${i}"><span class="mark"></span><span class="hl">${lineHTML(l.text)}</span><span class="note"></span></button>`).join("")}
       </div>`;
     main.querySelectorAll(".line").forEach(b => b.onclick = () => tap(b));
     setBar(`<button class="btn-serve" id="serve"><i class="ph ph-bell-simple-ringing"></i>出餐</button>`);
@@ -230,7 +404,7 @@
     }
     function submit() {
       if (done) return; done = true;
-      finish(2, st.found.length / total, { found: st.found.length, wrong: st.miss.length },
+      finish(c.no, st.found.length / total, { found: st.found.length, wrong: st.miss.length },
              { foundIdx: st.found.slice(), missIdx: st.miss.slice() });
     }
     startTimer(c.seconds, submit);
@@ -255,7 +429,8 @@
       const to = total(), from = shown; shown = to;
       const el = $("#ctot"), t0 = performance.now();
       if (RM) el.textContent = nt(to);
-      else (function f(t) { const k = Math.min(1, (t - t0) / 600); el.textContent = nt(Math.round(from + (to - from) * k)); if (k < 1) requestAnimationFrame(f); })(t0);
+      else { (function f(t) { const k = Math.min(1, (t - t0) / 600); el.textContent = nt(Math.round(from + (to - from) * k)); if (k < 1 && shown === to) requestAnimationFrame(f); })(t0);
+             setTimeout(() => { if (shown === to) el.textContent = nt(to); }, 700); }
       $("#capnote").textContent = to <= c.cap ? `上限 ${nt(c.cap)}，還剩 ${nt(c.cap - to)}` : `已超出上限 ${nt(to - c.cap)}`;
       const sv = $("#serve"); sv.disabled = sel.size === 0;
       sv.innerHTML = sel.size ? `<i class="ph ph-bell-simple-ringing"></i>出餐（已選 ${sel.size} 項）` : "先選出你認為漏算的成本";
@@ -273,12 +448,12 @@
     function submit() {
       if (done) return; done = true;
       const picked = [...sel], hits = picked.filter(i => c.cards[i].hidden).length;
-      finish(3, BQ.costAcc(picked, c.cards), { hits, traps: picked.length - hits }, { sel: picked });
+      finish(c.no, BQ.costAcc(picked, c.cards), { hits, traps: picked.length - hits }, { sel: picked });
     }
     startTimer(c.seconds, submit);
   }
 
-  // ── 第 4 道：特殊餐飲排座（先點賓客、再點桌子）──
+  // ── 特殊餐飲排座（先點賓客、再點桌子）──
   function playSeat(c) {
     renderHud(); main.className = "fixed";
     const place = {}; let armed = null, done = false;
@@ -311,12 +486,12 @@
     function submit() {
       if (done) return; done = true;
       const correct = c.guests.filter((g, i) => place[i] === g.ans).length;
-      finish(4, correct / c.guests.length, { correct }, { place: Object.assign({}, place) });
+      finish(c.no, correct / c.guests.length, { correct }, { place: Object.assign({}, place) });
     }
     draw(); startTimer(c.seconds, submit);
   }
 
-  // ── 第 5 道：客訴分類閃電戰（一則只分一次不能改，所以當場揭曉對錯＋連擊，不會變成試錯）──
+  // ── 客訴分類閃電戰（一則只分一次不能改，所以當場揭曉對錯＋連擊，不會變成試錯）──
   function playSort(c) {
     renderHud(); main.className = "fixed";
     const order = shuffle(c.items.map((_, i) => i));
@@ -358,47 +533,44 @@
     function submit() {
       if (done) return; done = true;
       const correct = c.items.filter((it, i) => answers[i] === it.cat).length;
-      finish(5, correct / c.items.length, { correct, bonus: s.bonus, best }, { answers: Object.assign({}, answers) }, s.bonus);
+      finish(c.no, correct / c.items.length, { correct, bonus: s.bonus, best }, { answers: Object.assign({}, answers) }, s.bonus);
     }
     drawCard(); startTimer(c.seconds, submit);
   }
 
   // ── 本道結算 ──
-  const BADGES = {
-    chef: { name: "提示詞主廚", icon: "chef-hat" }, eye: { name: "鷹眼審稿", icon: "eye" },
-    armchair: { name: "零客訴桌", icon: "armchair" }, clock: { name: "準時上菜", icon: "clock" },
-    cost: { name: "成本鷹眼", icon: "coins" }, flash: { name: "閃電客服", icon: "lightning" }
-  };
+  // 徽章資料在 game-data.js 每道的 badge；rare 越小越稀有。「準時上菜」是全場徽章
+  const CLOCK = { name: "準時上菜", icon: "clock", title: "準時上菜王", rare: 1 };
   function badgeFor(n, r) {
-    if (n === 1 && r.acc === 1) return BADGES.chef;
-    if (n === 2 && r.acc === 1 && r.detail.wrong === 0) return BADGES.eye;
-    if (n === 3 && r.acc === 1) return BADGES.cost;
-    if (n === 4 && r.acc === 1) return BADGES.armchair;
-    if (n === 5 && r.detail.best >= 8) return BADGES.flash;
-    return null;
+    const c = C(n); if (!c || !r || !r.detail) return null;
+    const earned = {
+      prompt: r.acc === 1, spot: r.acc === 1 && r.detail.wrong === 0, cost: r.acc === 1,
+      seat: r.acc === 1, sort: r.detail.best >= 8
+    }[c.kind];
+    return earned ? c.badge : null;
   }
   function statsLine(n, r) {
-    const t = `剩餘時間 ${Math.round(r.tf * 100)}%`;
-    if (n === 1) return `<span>積木品質 ${Math.round(r.acc * 100)}%</span><span>${t}</span>`;
-    if (n === 2) return `<span>找到 ${r.detail.found} / 5 個錯</span><span>誤標 ${r.detail.wrong} 次</span><span>${t}</span>`;
-    if (n === 3) return `<span>抓到 ${r.detail.hits} / ${C(3).cards.filter(x => x.hidden).length} 項漏算</span><span>踩到陷阱 ${r.detail.traps} 次</span><span>${t}</span>`;
-    if (n === 5) return `<span>分對 ${r.detail.correct} / ${C(5).items.length} 則</span><span>最高連擊 ×${r.detail.best}</span><span>連擊加分 +${r.detail.bonus}</span><span>${t}</span>`;
-    return `<span>排對 ${r.detail.correct} / ${C(4).guests.length} 位</span><span>${t}</span>`;
+    const c = C(n), t = `剩餘時間 ${Math.round(r.tf * 100)}%`;
+    if (c.kind === "prompt") return `<span>積木品質 ${Math.round(r.acc * 100)}%</span><span>${t}</span>`;
+    if (c.kind === "spot") return `<span>找到 ${r.detail.found} / ${c.lines.filter(l => l.wrong).length} 個錯</span><span>誤標 ${r.detail.wrong} 次</span><span>${t}</span>`;
+    if (c.kind === "cost") return `<span>抓到 ${r.detail.hits} / ${c.cards.filter(x => x.hidden).length} 項漏算</span><span>踩到陷阱 ${r.detail.traps} 次</span><span>${t}</span>`;
+    if (c.kind === "sort") return `<span>分對 ${r.detail.correct} / ${c.items.length} 則</span><span>最高連擊 ×${r.detail.best}</span><span>連擊加分 +${r.detail.bonus}</span><span>${t}</span>`;
+    return `<span>排對 ${r.detail.correct} / ${c.guests.length} 位</span><span>${t}</span>`;
   }
   function reviewHTML(n, r) {
-    const c = C(n);
+    const c = C(n), k = c.kind;
     const row = (ok, main_, sub) => `<div class="row ${ok ? "ok" : "ng"}"><i class="ph ph-${ok ? "check" : "x"}" aria-label="${ok ? "對" : "錯"}"></i><span>${main_}<small>${sub}</small></span></div>`;
-    if (n === 1) {
+    if (k === "prompt") {
       return `<div class="kicker">四塊積木逐一檢查</div>` + c.slots.map(s => {
         const i = r.picks[s.key], o = i != null ? s.options[i] : null, best = s.options.find(x => x.pts === 25);
         return row(o && o.pts === 25, `${s.label}：${o ? esc(o.text) : "沒放"}`, (o ? o.why : "") + (o && o.pts === 25 ? "" : `<br>更好：${esc(best.text)}`));
       }).join("");
     }
-    if (n === 2) {
-      return `<div class="kicker">5 個錯的解答</div>` + c.lines.map((l, i) => l.wrong
+    if (k === "spot") {
+      return `<div class="kicker">${c.lines.filter(l => l.wrong).length} 個錯的解答</div>` + c.lines.map((l, i) => l.wrong
         ? row(r.foundIdx.includes(i), r.foundIdx.includes(i) ? "抓到了" : "漏掉了", `${esc(l.text)}<br>${l.why}`) : "").join("");
     }
-    if (n === 3) {
+    if (k === "cost") {
       const sub = c.budget.reduce((a, b) => a + b.amount, 0);
       const real = sub + c.cards.filter(x => x.hidden).reduce((a, b) => a + b.amount, 0);
       const idx = c.cards.map((_, i) => i).sort((a, b) => c.cards[b].hidden - c.cards[a].hidden);
@@ -409,7 +581,7 @@
         return row(x.hidden === picked, `${label}：${esc(x.name)}（${nt(x.amount)}）`, x.why);
       }).join("");
     }
-    if (n === 5) {
+    if (k === "sort") {
       const lab = id => c.cats.find(z => z.id === id).label;
       const cnt = c.cats.map(z => ({ z, n: c.items.filter(it => it.cat === z.id).length })).sort((a, b) => b.n - a.n);
       return `<div class="learn" style="margin-top:0"><div class="kicker">這場客訴統計</div>${cnt.map(x => `${x.z.label} ${x.n} 件`).join("｜")}<br>件數最多：<b>${cnt[0].z.label}</b>。但排優先順序也要看嚴重度，食安和過敏優先。</div>
@@ -428,13 +600,14 @@
     const c = C(n);
     const links = `<a class="btn-ghost" href="https://chatgpt.com/" target="_blank" rel="noopener">開 ChatGPT</a><a class="btn-ghost" href="https://gemini.google.com/" target="_blank" rel="noopener">開 Gemini</a>`;
     let body;
-    if (n === 1) {
+    if (c.kind === "prompt") {
       const best = buildPrompt(c, bestPicks(c));
       body = `<div class="kicker">你們組出的提示詞</div><div class="ticket">${esc(r.prompt || "（沒有組出完整的提示詞）")}</div>
         ${r.acc < 1 ? `<div class="kicker" style="margin-top:12px">滿分版本</div><div class="ticket">${esc(best)}</div>` : ""}`;
       r._copy = r.acc < 1 ? best : r.prompt;
     } else { body = `<div class="kicker">帶回家的提示詞：自己用 AI 做一次</div><div class="ticket">${esc(c.takehome)}</div>`; r._copy = c.takehome; }
-    return `<div class="take">${body}<div class="acts"><button class="btn-ghost" id="copy"><i class="ph ph-copy"></i>複製提示詞</button>${links}</div></div>`;
+    return `<div class="take">${body}<div class="acts"><button class="btn-ghost" id="copy"><i class="ph ph-copy"></i>複製提示詞</button>${links}</div></div>` +
+      (c.imageBuilder ? builderHTML(c.imageBuilder) : "");
   }
   function syncHTML(r, pending) {
     if (pending) return `<span style="color:var(--c-muted)">送到投影幕中…</span>`;
@@ -472,6 +645,7 @@
       <div class="review">${reviewHTML(n, r)}</div>
       ${takeHTML(n, r)}`;
     $("#copy").onclick = () => copyText(r._copy);
+    if (c.imageBuilder) wireBuilder(c.imageBuilder);
     setBar(`<button class="btn-serve" id="menu">回菜單</button>`);
     $("#menu").onclick = renderMenu;
     if (!fresh) { updateSync(n); showRank("#rank"); }
@@ -482,6 +656,7 @@
     if (RM) { el.textContent = target; return; }
     const t0 = performance.now();
     (function f(t) { const k = Math.min(1, (t - t0) / 600); el.textContent = Math.round(target * (1 - Math.pow(1 - k, 3))); if (k < 1) requestAnimationFrame(f); })(t0);
+    setTimeout(() => { el.textContent = target; }, 700);   // 保險：畫面沒在重繪（切到背景）時動畫會停住
   }
 
   // ── 銀餐蓋＋金色紙片 ──
@@ -519,14 +694,12 @@
     stopTimer(); renderHud(); main.className = ""; main.scrollTop = 0;
     const t = BQ.team(S.team), tot = totalScore();
     // 稀有度由高到低；成果卡最多放 3 枚，稱號取最稀有的那枚
-    const RARITY = ["準時上菜", "鷹眼審稿", "成本鷹眼", "零客訴桌", "閃電客服", "提示詞主廚"];
-    const TITLES = { "準時上菜": "準時上菜王", "鷹眼審稿": "鷹眼審稿組", "成本鷹眼": "成本鷹眼組",
-                     "零客訴桌": "零客訴桌", "閃電客服": "閃電客服組", "提示詞主廚": "提示詞主廚" };
     const got = PLAYABLE.map(n => R[n] ? badgeFor(n, R[n]) : null).filter(Boolean);
-    if (PLAYABLE.every(n => R[n] && R[n].tf >= 0.5)) got.push(BADGES.clock);
-    got.sort((a, b) => RARITY.indexOf(a.name) - RARITY.indexOf(b.name));
+    if (PLAYABLE.every(n => R[n] && R[n].tf >= 0.5)) got.push(CLOCK);
+    got.sort((a, b) => a.rare - b.rare);
     const pins = got.slice(0, 3);
-    const title = got.length ? TITLES[got[0].name] : "全場敬業獎";
+    const title = got.length ? got[0].title : "全場敬業獎";
+    const P = GAME.courses.find(x => x.kind === "prompt").no;
     const d = new Date(), date = `${d.getFullYear()}.${pad(d.getMonth() + 1)}.${pad(d.getDate())}`;
     main.innerHTML = `
       <div class="ticket final" id="card">
@@ -537,8 +710,8 @@
         <div>${GAME.courses.map(c => `<div class="frow"><span>${pad(c.no)} ${c.title}</span><b>${c.kind === "soon" ? "下次開放" : (R[c.no] ? R[c.no].score : "—")}</b></div>`).join("")}</div>
         ${pins.length ? `<div class="fpins">${pins.map(b => `<span>${b.name}</span>`).join("")}</div>` : ""}
         <div class="no">本組寫出的提示詞</div>
-        <div class="fprompt">${esc((R[1] && R[1].prompt) || "（第 1 道沒有組出完整提示詞）")}</div>
-        <div class="no" style="text-align:center">— TICKET #${esc(S.session)}-${pad(S.team)} —</div>
+        <div class="fprompt">${esc((R[P] && R[P].prompt) || "（提示詞積木那道沒有組出完整提示詞）")}</div>
+        <div class="no" style="text-align:center">— TICKET #${esc(S.session)}-${pad(S.team)} · ${BRAND} —</div>
       </div>
       <p style="text-align:center;color:var(--c-muted);font-size:13px;margin-top:12px">截圖存下這張卡。上面那句提示詞，回家就能直接拿去問 AI。</p>`;
     setBar(`<button class="btn-serve" id="menu">回菜單</button>`);

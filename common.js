@@ -69,5 +69,28 @@
     return { streak, bonus: streak >= 3 ? Math.min(10, s.bonus + 2) : s.bonus };
   }
 
-  window.BQ = { shapeSVG, team, teamLabel, submitScore, fetchBoard, store, esc, courseScore, costAcc, comboStep };
+  // ── 數位生產線（純函式，有測試；n8n 流程也嵌入同一份程式）──
+  // 供應商回覆 → 要發給外場／廚房的通知；準時不用通知
+  function supplyNotice(sup, status, delay) {
+    if (status === "late") return sup.late.replace("{d}", String(Number(delay) || 0));
+    if (status === "out") return sup.out;
+    return "";
+  }
+  // 每家供應商的「實際狀況」vs「外場以為的狀況」。外場預設以為準時；
+  // 只有通知節點接著（Notified）的回覆才會更新外場的認知。兩者不同＝資訊落差
+  // 「有沒有通知到外場」只用這一個判斷（資料庫勾選欄位可能是 true、1、"1"、"true"）
+  function isNotified(x) { return x === true || x === 1 || x === "1" || x === "true"; }
+  function fohView(rows) {
+    const v = {};
+    rows.filter(r => ["ok", "late", "out"].includes(r.Status)).sort((a, b) => a.Id - b.Id).forEach(r => {
+      const t = Number(r.Team);
+      const truth = { status: r.Status, delay: r.Status === "late" ? Number(r.DelayMin) || 0 : 0 };
+      const cur = v[t] || { foh: { status: "ok", delay: 0 } };
+      v[t] = { truth, foh: isNotified(r.Notified) ? Object.assign({}, truth) : cur.foh };
+    });
+    Object.values(v).forEach(x => { x.gap = x.truth.status !== x.foh.status || x.truth.delay !== x.foh.delay; });
+    return v;
+  }
+
+  window.BQ = { shapeSVG, team, teamLabel, submitScore, fetchBoard, store, esc, courseScore, costAcc, comboStep, supplyNotice, fohView, isNotified };
 })();
