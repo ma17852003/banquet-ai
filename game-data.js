@@ -32,7 +32,7 @@ window.GAME = {
           cards: [
             { label: "Who", zh: "誰", icon: "users", analogy: "辦生日趴第一件事：要請誰？誰來幫忙？", example: "300 位通路商、採購、媒體，其中 20 位吃清真、15 位吃素、1 位坐輪椅" },
             { label: "What", zh: "做什麼", icon: "fork-knife", analogy: "煮飯前先決定：今天煮什麼菜？", example: "新品發表＋晚宴，主角是新品「冷萃烏龍燕麥奶」" },
-            { label: "When", zh: "什麼時候", icon: "clock", analogy: "訂高鐵票：幾點出發、幾點到？", example: "18:30 入場、19:00 發表、20:00 開席、21:30 送客" },
+            { label: "When", zh: "什麼時候", icon: "clock", analogy: "訂餐廳：幾點入座、用餐限時多久？", example: "18:30 入場、19:00 發表、20:00 開席、21:30 送客" },
             { label: "Where", zh: "在哪裡", icon: "map-pin", analogy: "找餐廳訂位，先問：坐得下嗎？", example: "飯店宴會廳，要坐得下 300 人、有舞台和投影" },
             { label: "Why", zh: "為什麼", icon: "target", analogy: "請朋友吃飯，是要慶祝，還是要拜託事情？", example: "讓通路商願意把新品放上貨架" },
             { label: "How", zh: "怎麼做", icon: "list-numbers", analogy: "照食譜一步一步做，誰先誰後", example: "報到 → 發表 → 上菜 → 送客，每一步誰負責" },
@@ -50,25 +50,12 @@ window.GAME = {
             { text: "讓通路商願意上架新品", ans: "why", why: "講目的，就是 Why。" },
             { text: "有 20 位賓客吃清真", ans: "who", why: "講「來的是誰、他們需要什麼」，屬於 Who。" }
           ] },
-        { type: "guess", mins: 0.5, title: "先猜猜看",
-          question: "如果你只對 AI 說「幫我辦活動」，它最可能給你什麼？",
-          options: ["一份可以直接用的企劃書", "一堆誰都適用的空泛建議", "它會拒絕回答"], answer: 1,
-          explain: "AI 不知道你要辦什麼、幾個人、多少錢，只好給你網路上最普通的答案。就像跟飲料店說「我要一杯」，店員只能一直反問你。下一頁試試看。" },
-        { type: "toggle", mins: 1, title: "交代清楚，就像點飲料",
-          intro: "打開開關，把點餐講清楚，看店員的反應怎麼變。", lead: "你說：我要一杯",
-          parts: [
-            { label: "品項", say: "珍珠奶茶", off: "店員：請問要什麼飲料？", on: "✓ 珍珠奶茶" },
-            { label: "大小", say: "大杯", off: "店員：要大杯還是中杯？", on: "✓ 大杯" },
-            { label: "甜度", say: "半糖", off: "店員：甜度呢？", on: "✓ 半糖" },
-            { label: "冰塊", say: "少冰", off: "店員：冰塊怎麼調？", on: "✓ 少冰" }
-          ],
-          done: "店員：好的！大杯珍奶半糖少冰，馬上來。" },
         { type: "toggle", mins: 1, title: "交代 AI 的 4 個開關",
-          intro: "交代 AI 也一樣。一顆一顆打開，看回答怎麼變好；再關掉一顆，看少了它會怎樣。", lead: "你對 AI 說：",
+          intro: "就像點飲料：品項、大小、甜度、冰塊講清楚，店員才不用一直反問你。交代 AI 也一樣，一顆一顆打開，看回答怎麼變好；再關掉一顆，看少了它會怎樣。", lead: "你對 AI 說：",
           parts: [
             { label: "角色", say: "你是五星飯店宴會企劃經理，", off: "✗ 語氣像學生作文，沒有專業用語", on: "✓ 用宴會企劃的專業語言和格式" },
             { label: "任務", say: "幫我寫 300 人新品發表餐會的企劃書，", off: "✗ 不知道要辦什麼，只給一般活動建議", on: "✓ 內容對準「300 人新品發表餐會」" },
-            { label: "條件", say: "包含 5W2H，有 20 位清真賓客，預算 150 萬內，", off: "✗ 可能排出豬肉菜單、預算爆表", on: "✓ 照 5W2H 寫，菜單避開豬肉、預算算在 150 萬內" },
+            { label: "條件", say: "包含 5W2H，有 20 位清真、15 位素食賓客，預算 150 萬內，", off: "✗ 可能排出豬肉菜單、預算爆表", on: "✓ 照 5W2H 寫，菜單避開豬肉、預算算在 150 萬內" },
             { label: "格式", say: "用表格，附負責人和期限。", off: "✗ 丟給你一大段文字，還要自己整理", on: "✓ 一張表格，拿到就能分工" }
           ],
           done: "這 4 個開關，就是等一下要練習的「提示詞積木」：角色＋任務＋條件＋格式。" }
@@ -158,21 +145,21 @@ window.GAME = {
       staff: "會計員", icon: "calculator", seconds: 240, cap: 1500000,
       badge: { name: "成本鷹眼", icon: "coins", title: "成本鷹眼組", rare: 4 },
       teach: [
-        { type: "guess", mins: 1.5, title: "先猜：這張機票最後要付多少？",
-          question: "網站上寫「台北飛東京 NT$1,999」，結帳時大概要付多少？",
-          options: ["NT$1,999", "大約 NT$2,500", "大約 NT$4,500"], answer: 2,
+        { type: "guess", mins: 1.5, title: "先猜：這頓吃到飽最後要付多少？",
+          question: "網路上寫「吃到飽 NT$599／人」，週末 4 個人去慶生、自己帶蛋糕，結帳時大概要付多少？",
+          options: ["NT$2,396", "大約 NT$2,700", "大約 NT$3,600"], answer: 2,
           checkout: [
-            { label: "機票標價", amount: 1999 }, { label: "機場稅與燃油附加費", amount: 1280 },
-            { label: "托運行李 20 公斤", amount: 900 }, { label: "選位", amount: 300 }, { label: "刷卡手續費", amount: 50 }
+            { label: "餐費 599 × 4 人", amount: 2396 }, { label: "週末每人加價 100", amount: 400 },
+            { label: "飲料另計 4 杯", amount: 320 }, { label: "自帶蛋糕切蛋糕費", amount: 300 }, { label: "10% 服務費（餐費的一成）", amount: 240 }
           ],
-          explain: "最後要付 NT$4,529，比標價多了一倍以上。這些一開始沒寫出來、結帳才跳出來的錢，就叫「隱藏成本」。" },
+          explain: "最後要付 NT$3,656，比標價多了一半以上。這些一開始沒寫出來、結帳才跳出來的錢，就叫「隱藏成本」。" },
         { type: "flip", mins: 1.5, title: "宴會最常漏掉的 4 種錢",
           intro: "一張一張點開，看生活裡哪裡也有這種錢。",
           cards: [
             { label: "服務費", icon: "receipt", analogy: "餐廳帳單最後多一行「加收 10%」", example: "飯店餐飲常另加一成服務費，300 人餐費 96 萬，光服務費就 9.6 萬" },
-            { label: "加班費", icon: "clock", analogy: "半夜坐計程車，有夜間加成", example: "散場後撤場拖過合約時間，就要付工作人員加班費" },
+            { label: "加班費", icon: "clock", analogy: "半夜叫宵夜外送，多收一筆夜間費", example: "散場後撤場拖過合約時間，就要付工作人員加班費" },
             { label: "損耗備品", icon: "package", analogy: "煮飯會多煮一點，怕客人不夠吃", example: "多備 5% 餐點，以防臨時多來的客人或出餐失誤" },
-            { label: "合約小字", icon: "file-text", analogy: "手機合約裡藏的違約金", example: "場地清潔費、保險，常寫在合約最後一頁" }
+            { label: "合約小字", icon: "file-text", analogy: "吃到飽菜單最下面的小字：剩食要罰錢", example: "場地清潔費、保險，常寫在合約最後一頁" }
           ],
           reveal: { title: "AI 估價只看「標價」", text: "AI 不知道你們場地另外收什麼。用 AI 估預算，一定要追問一句：「還有哪些常被漏掉的費用？」然後拿合約一項一項對。" } },
         { type: "match", mins: 1, title: "小測驗：要另外算，還是已經包含？",
