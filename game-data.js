@@ -42,14 +42,17 @@ window.GAME = {
           reveal: { title: "這 7 個問題，就叫 5W2H", text: "5 個 W（Who、What、When、Where、Why）加 2 個 H（How、How much）。企劃書先把這 7 格填滿，就不太會漏東西。等一下交代 AI 寫企劃，也要叫它照這 7 格寫。" } },
         { type: "match", mins: 1, title: "小測驗：這句屬於哪一格？",
           intro: "先點一句話，再點它屬於的那一格。",
-          targets: [ { id: "who", label: "Who 誰" }, { id: "when", label: "When 什麼時候" }, { id: "where", label: "Where 在哪裡" },
-                     { id: "why", label: "Why 為什麼" }, { id: "howmuch", label: "How much 多少錢" } ],
+          targets: [ { id: "who", label: "Who 誰" }, { id: "what", label: "What 做什麼" }, { id: "when", label: "When 什麼時候" },
+                     { id: "where", label: "Where 在哪裡" }, { id: "why", label: "Why 為什麼" }, { id: "how", label: "How 怎麼做" },
+                     { id: "howmuch", label: "How much 多少錢" } ],
           items: [
             { text: "18:30 開放入場", ans: "when", why: "講時間，就是 When。" },
             { text: "宴會廳要坐得下 300 人", ans: "where", why: "講場地，就是 Where。" },
             { text: "總預算 150 萬內", ans: "howmuch", why: "講錢，就是 How much。" },
             { text: "讓通路商願意上架新品", ans: "why", why: "講目的，就是 Why。" },
-            { text: "有 20 位賓客吃清真", ans: "who", why: "講「來的是誰、他們需要什麼」，屬於 Who。" }
+            { text: "有 20 位賓客吃清真", ans: "who", why: "講「來的是誰、他們需要什麼」，屬於 Who。" },
+            { text: "這是一場新品發表晚宴", ans: "what", why: "講要辦的是什麼活動，就是 What。" },
+            { text: "先報到、再發表、最後上菜", ans: "how", why: "講步驟和順序，就是 How。" }
           ] },
         { type: "toggle", mins: 1, title: "交代 AI 的 4 個開關",
           intro: "就像點飲料：品項、大小、甜度、冰塊講清楚，店員才不用一直反問你。交代 AI 也一樣，一顆一顆打開，看回答怎麼變好；再關掉一顆，看少了它會怎樣。", lead: "你對 AI 說：",
