@@ -22,24 +22,44 @@
 
   // 交分數：表單格式＝瀏覽器不會先送預檢請求；回應必須是 {ok:true} 才算成功
   //（後端擋下不合法資料時會回 200 但內容是空的，所以不能只看 HTTP 200）
-  async function submitScore(p) {
+  async function post(path, fields, ms) {
     try {
-      const body = new URLSearchParams({ session: p.session, team: String(p.team), level: String(p.course),
-                                         score: String(p.score), detail: JSON.stringify(p.detail || {}) });
-      const ctrl = new AbortController(); const tid = setTimeout(() => ctrl.abort(), 8000);
-      const r = await fetch(GAME.api + "/banquet-score", { method: "POST", body, signal: ctrl.signal });
+      const ctrl = new AbortController(); const tid = setTimeout(() => ctrl.abort(), ms || 8000);
+      const r = await fetch(GAME.api + path, { method: "POST", body: new URLSearchParams(fields), signal: ctrl.signal });
       clearTimeout(tid);
       const j = await r.json().catch(() => null);
-      return !!(j && j.ok === true);
-    } catch (e) { return false; }
+      return j && j.ok === true ? j : null;
+    } catch (e) { return null; }
   }
+  // 分數要帶個人編號和這一輪的 resetId；後端只算這一輪的分數
+  async function submitScore(p) {
+    return !!(await post("/banquet-score", { session: p.session, team: String(p.team), level: String(p.course), score: String(p.score),
+                                             player: String(p.player), resetId: String(p.resetId), detail: JSON.stringify(p.detail || {}) }));
+  }
+  // 這支手機的固定識別碼：取號回應掉了重送，或換桌重新入座，都拿回同一個號碼
+  let cid = "";   // 瀏覽器擋住 localStorage 時，至少這次開著的期間識別碼不變
+  function deviceId() {
+    if (!cid) cid = store.get("bq-cid", "");
+    if (!cid) { cid = Math.random().toString(36).slice(2, 10) + Date.now().toString(36); store.set("bq-cid", cid); }
+    return cid;
+  }
+  // 入座取號：回 { player, resetId }，失敗回 null
+  async function joinPlayer(session, team) {
+    const j = await post("/banquet-join", { session, team: String(team), cid: deviceId() });
+    return j && j.player >= 1 ? { player: j.player, resetId: j.resetId } : null;
+  }
+  // 新的一堂課：清掉這個場次的成績、編號。回 { resetId }，失敗回 null
+  async function resetSession(session) {
+    return post("/banquet-reset", { session, confirm: "yes" }, 15000);
+  }
+  // 排行榜：回 { board:[{player,team,total,levels,cleared,rank}], players, resetId }，失敗回 null
   async function fetchBoard(session) {
     try {
       const ctrl = new AbortController(); const tid = setTimeout(() => ctrl.abort(), 6000);
       const r = await fetch(GAME.api + "/banquet-board?session=" + encodeURIComponent(session), { signal: ctrl.signal, cache: "no-store" });
       clearTimeout(tid);
       const j = await r.json();
-      return Array.isArray(j.board) ? j.board : null;
+      return Array.isArray(j.board) ? j : null;
     } catch (e) { return null; }
   }
 
@@ -69,28 +89,52 @@
     return { streak, bonus: streak >= 3 ? Math.min(10, s.bonus + 2) : s.bonus };
   }
 
-  // ── 數位生產線（純函式，有測試；n8n 流程也嵌入同一份程式）──
-  // 供應商回覆 → 要發給外場／廚房的通知；準時不用通知
-  function supplyNotice(sup, status, delay) {
-    if (status === "late") return sup.late.replace("{d}", String(Number(delay) || 0));
-    if (status === "out") return sup.out;
-    return "";
+  // ── 場次碼：1、2、3…（最多 4 位數，"0002" 當成 "2"，0 不算）──
+  function normSession(raw) {
+    const s = String(raw == null ? "" : raw).trim();
+    if (!/^\d{1,4}$/.test(s)) return "";
+    return Number(s) > 0 ? String(Number(s)) : "";
   }
-  // 每家供應商的「實際狀況」vs「外場以為的狀況」。外場預設以為準時；
-  // 只有通知節點接著（Notified）的回覆才會更新外場的認知。兩者不同＝資訊落差
-  // 「有沒有通知到外場」只用這一個判斷（資料庫勾選欄位可能是 true、1、"1"、"true"）
-  function isNotified(x) { return x === true || x === 1 || x === "1" || x === "true"; }
-  function fohView(rows) {
-    const v = {};
-    rows.filter(r => ["ok", "late", "out"].includes(r.Status)).sort((a, b) => a.Id - b.Id).forEach(r => {
-      const t = Number(r.Team);
-      const truth = { status: r.Status, delay: r.Status === "late" ? Number(r.DelayMin) || 0 : 0 };
-      const cur = v[t] || { foh: { status: "ok", delay: 0 } };
-      v[t] = { truth, foh: isNotified(r.Notified) ? Object.assign({}, truth) : cur.foh };
+  // 題目檔是快取的舊版時 GAME.site 會是 undefined，QR 就壞了；所以這裡留一份保險
+  const studentURL = session => (GAME.site || "https://ma17852003.github.io/banquet-ai/") + "index.html?s=" + session;
+
+  // ── 個人編號（純函式，有測試；n8n 計分流程嵌入同一份）──
+  // Players 表每次入座寫一列 join、每次「新的一堂課」寫一列 reset（reset 列永遠不刪，所以 resetId 只增不減）。
+  // 編號＝自己這列在「最後一次 reset 之後的 join」裡排第幾；同時入座各拿到不同的 Id，編號不會重複（實測 30 人同時入座＝1～30）
+  function lastReset(rows) {
+    return rows.filter(r => r.Kind === "reset").reduce((m, r) => Math.max(m, Number(r.Id)), 0);
+  }
+  // 這一輪的「人」：同一支手機（Cid）重送入座只算一個人、用第一次的順序排號；換桌時桌號用最新那列
+  function joinsSince(rows) {
+    const from = lastReset(rows), people = [], byCid = {};
+    rows.filter(r => r.Kind === "join" && Number(r.Id) > from).sort((a, b) => a.Id - b.Id).forEach(r => {
+      const p = r.Cid ? byCid[r.Cid] : null;
+      if (p) { p.Team = r.Team; p.ids.push(Number(r.Id)); return; }
+      const np = { Team: r.Team, ids: [Number(r.Id)] };
+      if (r.Cid) byCid[r.Cid] = np;
+      people.push(np);
     });
-    Object.values(v).forEach(x => { x.gap = x.truth.status !== x.foh.status || x.truth.delay !== x.foh.delay; });
-    return v;
+    return people;
+  }
+  function playerNo(rows, id) {
+    return joinsSince(rows).findIndex(p => p.ids.includes(Number(id))) + 1;
+  }
+  // 個人排行：只算這一輪（Epoch＝resetId）的分數，同人同道取最高再加總；同分同名次
+  function rankPlayers(scores, players) {
+    const resetId = lastReset(players), joins = joinsSince(players);
+    const board = joins.map((r, i) => ({ player: i + 1, team: Number(r.Team), levels: {}, total: 0, cleared: 0 }));
+    scores.forEach(s => {
+      const b = board[Number(s.Player) - 1];
+      if (!b || Number(s.Epoch) !== resetId) return;
+      const lv = String(s.Level);
+      b.levels[lv] = Math.max(b.levels[lv] || 0, Number(s.Score) || 0);
+    });
+    board.forEach(b => { b.total = Object.values(b.levels).reduce((a, x) => a + x, 0); b.cleared = Object.keys(b.levels).length; });
+    board.sort((a, b) => b.total - a.total || a.player - b.player);
+    board.forEach(b => { b.rank = 1 + board.filter(x => x.total > b.total).length; });
+    return { resetId, players: joins.length, board };
   }
 
-  window.BQ = { shapeSVG, team, teamLabel, submitScore, fetchBoard, store, esc, courseScore, costAcc, comboStep, supplyNotice, fohView, isNotified };
+  window.BQ = { shapeSVG, team, teamLabel, submitScore, fetchBoard, joinPlayer, resetSession, store, esc, courseScore, costAcc, comboStep, normSession, studentURL,
+                lastReset, playerNo, rankPlayers };
 })();

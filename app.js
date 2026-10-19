@@ -11,17 +11,43 @@
   const vibrate = () => { try { navigator.vibrate && navigator.vibrate(12); } catch (e) {} };
   const BRAND = "James Wu｜AI 造王者";
 
-  // ── 狀態：誰（場次＋桌）與各道成績，存在本機 ──
+  // ── 狀態：誰（場次＋桌＋個人編號＋這一輪的 resetId）與各道成績，存在本機 ──
   let S = BQ.store.get("bq-who", {});
   const qs = new URLSearchParams(location.search);
-  if (qs.get("s")) S.session = qs.get("s").replace(/\D/g, "").slice(0, 4);
+  if (qs.get("s")) {
+    const s = BQ.normSession(qs.get("s"));
+    if (s && s !== S.session) S = { session: s };   // 換了場次＝新的人，要重新選桌拿號
+  }
+  const saveWho = () => BQ.store.set("bq-who", S);
+  if (S.player && S.resetId == null) { delete S.player; saveWho(); }
   let R = {};
-  const resKey = () => `bq-res8-${S.session}-${S.team}`;   // v8 起 6 道重新編號，舊的 bq-res- 存檔不再讀
+  const resKey = () => `bq-res11-${S.session}`;   // v11 起成績跟著場次存；換一輪（老師重設）時由 clearLocal 清掉。舊的 bq-res8- 存檔不再讀
   const loadRes = () => { R = (S.session && S.team) ? BQ.store.get(resKey(), {}) : {}; };
+  const clearLocal = () => { R = {}; saveRes(); BQ.store.set(teachKey(), []); };
+  // 拿號：還沒有號碼就跟後端要一個；網路不通就回 false，之後再補
+  // 同一時間只送一次取號請求，不然菜單更新和補送分數同時跑，一支手機會佔掉兩個號碼
+  let joining = null;
+  function ensurePlayer() {
+    if (S.player) return Promise.resolve(true);
+    if (joining) return joining.key === S.session + "/" + S.team ? joining : joining.then(() => ensurePlayer());
+    const ses = S.session, tm = S.team;
+    joining = BQ.joinPlayer(ses, tm).then(j => {
+      joining = null;
+      if (!j || S.session !== ses || S.team !== tm || S.player) return !!S.player;   // 取號途中換了桌／場次：這個號碼作廢
+      const prev = S.seenReset != null ? S.seenReset : S.resetId;   // 換桌時號碼清掉了，但上一輪的 resetId 還在
+      if (prev != null && j.resetId !== prev) clearLocal();   // 拿到的是新的一堂課的號碼：手上的舊成績不送進去
+      S.player = j.player; S.resetId = j.resetId; delete S.seenReset; saveWho();
+      renderHudChip();
+      return true;
+    });
+    joining.key = ses + "/" + tm;
+    return joining;
+  }
+  const meLabel = () => (S.player ? `${S.player} 號 · ` : "取號中 · ") + BQ.teamLabel(S.team);
   const saveRes = () => BQ.store.set(resKey(), R);
   const totalScore = () => Object.values(R).reduce((a, r) => a + (r.score || 0), 0);
   // 哪幾道已經上完課（存本機）；沒上完課不能練習
-  const teachKey = () => `bq-teach-${S.session}-${S.team}`;
+  const teachKey = () => `bq-teach11-${S.session}`;
   const TEACH = () => BQ.store.get(teachKey(), []);
   const markTaught = n => { const t = TEACH(); if (!t.includes(n)) { t.push(n); BQ.store.set(teachKey(), t); } };
 
@@ -50,10 +76,11 @@
   function renderHud() {
     hud.hidden = false;
     const t = BQ.team(S.team);
-    hud.innerHTML = `<span class="chip">${BQ.shapeSVG(t)}<span>${BQ.teamLabel(S.team)}</span></span>
+    hud.innerHTML = `<span class="chip" id="me-chip">${BQ.shapeSVG(t)}<span>${meLabel()}</span></span>
       <span class="timer" id="tmr" role="timer" aria-label="剩餘時間"></span>
       <span class="score"><span class="kicker">總分</span><br><b id="tot">${totalScore()}</b></span>`;
   }
+  function renderHudChip() { const el = $("#me-chip span"); if (el) el.textContent = meLabel(); }
   function setBar(html) { bar.innerHTML = html; }
   let toastT;
   function toast(msg) {
@@ -76,14 +103,15 @@
       <p class="lead">今晚 300 人的國際食品品牌新品發表餐會，交給你們這桌，指揮 AI 超級團隊把它辦好。</p>
       <div class="kicker" style="margin-top:20px">選你們的桌</div>
       <div class="tables-pick">${GAME.teams.map(t => `<button class="seat-card" data-t="${t.no}" aria-pressed="${pick === t.no}">${BQ.shapeSVG(t, 26)}<span><small>TABLE ${pad(t.no)} · 第 ${t.no} 桌</small><b style="font-size:18px">${t.name}</b></span></button>`).join("")}</div>
-      <label class="kicker" for="code">輸入投影幕上的 4 位數場次碼</label>
+      <label class="kicker" for="code">輸入投影幕上的場次碼</label>
       <input id="code" class="code-input" inputmode="numeric" maxlength="4" autocomplete="off" value="${esc(S.session || "")}">
+      ${S.player ? `<p class="hint" style="margin-top:10px">你現在是 ${S.player} 號。換桌會沿用你的號碼和分數；換場次會拿新的號碼。</p>` : ""}
       <p class="brand">業師 ${BRAND}・中小企業 AI 轉型專家</p>`;
     setBar(`<button class="btn-serve" id="go" disabled>入座</button>`);
     const go = $("#go"), code = $("#code");
     const check = () => {
-      const ok = pick && /^\d{4}$/.test(code.value);
-      go.disabled = !ok; go.textContent = ok ? "入座" : (!pick ? "先選一張桌" : "輸入 4 位數場次碼");
+      const ok = pick && BQ.normSession(code.value);
+      go.disabled = !ok; go.textContent = ok ? "入座" : (!pick ? "先選一張桌" : "輸入場次碼");
     };
     main.querySelectorAll(".seat-card").forEach(b => b.onclick = () => {
       pick = Number(b.dataset.t);
@@ -91,8 +119,56 @@
       check();
     });
     code.oninput = () => { code.value = code.value.replace(/\D/g, "").slice(0, 4); check(); };
-    go.onclick = () => { S = { session: code.value, team: pick }; BQ.store.set("bq-who", S); loadRes(); renderMenu(); };
+    go.onclick = () => {
+      const ses = BQ.normSession(code.value);
+      if (S.session === ses) {   // 同一個場次：成績都留著（取號中的未送成績也不能清掉）
+        if (S.team === pick && S.player) { renderMenu(); return; }
+        if (S.team !== pick) { S.team = pick; S.player = null; saveWho(); }   // 換桌：同一支手機重新入座會拿回同一個號碼，桌名更新
+        renderJoin(); return;
+      }
+      S = { session: ses, team: pick }; saveWho(); loadRes(); clearLocal(); renderJoin();   // 換場次＝新的一堂課
+    };
     check();
+  }
+
+  // ── 拿號畫面：大字顯示「你是 12 號」──
+  async function renderJoin() {
+    stopTimer(); renderHud(); main.className = "";
+    main.innerHTML = `<div class="kicker" style="text-align:center;margin-top:40px">取號中…</div>`;
+    setBar("");
+    const ok = await ensurePlayer();
+    main.innerHTML = ok
+      ? `<div class="kicker" style="text-align:center;margin-top:32px">你的編號</div>
+         <div class="bigscore" style="text-align:center">${S.player} 號</div>
+         <p class="lead" style="text-align:center">記住你的號碼，投影幕排行榜就是用編號排名。</p>`
+      : `<div class="kicker" style="text-align:center;margin-top:32px">網路不太穩</div>
+         <p class="lead" style="text-align:center">先開始玩，號碼和分數等網路恢復會自動補上。</p>`;
+    setBar(`<button class="btn-serve" id="go-menu" style="flex:1">開始</button>`);
+    $("#go-menu").onclick = renderMenu;
+  }
+  // 菜單最上方：「12 號｜312 分｜第 7 名（共 28 人）」；順便偵測老師有沒有開新的一堂課
+  async function refreshMe() {
+    const el = $("#me"); if (!el) return;
+    let b = await BQ.fetchBoard(S.session);
+    if (!$("#me")) return;
+    if (b && typeof b.resetId === "number" && S.resetId != null && b.resetId !== S.resetId) { await newClass(); return; }
+    if (b && typeof b.resetId === "number" && S.resetId == null && S.seenReset == null) { S.seenReset = b.resetId; saveWho(); }   // 還沒號碼：先記住現在是哪一堂課
+    const has = await ensurePlayer();
+    const pending = has ? Object.keys(R).filter(k => !R[k].synced) : [];
+    for (const k of pending) await sync(Number(k));   // 拿到號碼後補送，送完再讀一次排行才算得到這些分數
+    if (pending.length) { b = await BQ.fetchBoard(S.session); if (!$("#me")) return; }
+    const me = b && b.board.find(x => x.player === S.player);
+    el.innerHTML = !S.player ? "取號中，網路恢復就會補上"
+      : me && me.total > 0 ? `<b>${S.player} 號</b>｜${me.total} 分｜第 ${me.rank} 名（共 ${b.players} 人）`
+      : me ? `<b>${S.player} 號</b>｜還沒出餐（共 ${b.players} 人）`
+      : `<b>${S.player} 號</b>｜${totalScore()} 分`;
+    const sync1 = $(".sync.bad"); if (sync1 && Object.values(R).every(r => r.synced)) sync1.remove();
+  }
+  async function newClass() {
+    clearLocal(); S.player = null; S.resetId = null; saveWho();
+    const ok = await ensurePlayer();
+    toast(ok ? `老師開了新的一堂課，你的新編號是 ${S.player} 號` : "老師開了新的一堂課，網路恢復後會給你新號碼");
+    if ($("#me")) renderMenu();
   }
 
   // ── 菜單卡（關卡地圖）──
@@ -109,6 +185,7 @@
     }).join("");
     const unsynced = Object.keys(R).filter(k => !R[k].synced);
     main.innerHTML = `
+      <p class="me" id="me" aria-live="polite">${S.player ? `<b>${S.player} 號</b>｜${totalScore()} 分` : "取號中…"}</p>
       <div class="ticket menu"><div class="head"><div class="no">LAUNCH BANQUET · 300 PAX</div>
         <div class="serif" style="font-weight:900;font-size:26px;margin-top:6px">今晚菜單</div>
         <div style="font-size:14px;color:var(--c-ink-muted)">${esc(GAME.scenario.title)}</div></div>
@@ -121,6 +198,7 @@
       if (R[n]) renderResult(n, false); else if (TEACH().includes(n)) renderIntro(n); else renderTeach(n, 0);
     });
     $("#swap").onclick = renderEntry;
+    refreshMe();
     if (unsynced.length) $("#resync").onclick = async () => {
       for (const k of unsynced) await sync(Number(k));
       renderMenu();
@@ -325,7 +403,8 @@
   }
   async function sync(n) {
     const r = R[n];
-    r.synced = await BQ.submitScore({ session: S.session, team: S.team, course: n, score: r.score, detail: r.detail });
+    if (!(await ensurePlayer())) { r.synced = false; saveRes(); return false; }   // 沒號碼的分數不送，拿到號碼再補
+    r.synced = await BQ.submitScore({ session: S.session, team: S.team, player: S.player, resetId: S.resetId, course: n, score: r.score, detail: r.detail });
     saveRes();
     return r.synced;
   }
@@ -623,11 +702,13 @@
   }
   async function showRank(sel) {
     const el = $(sel); if (!el) return;
-    const board = await BQ.fetchBoard(S.session);
-    if (!board || !$(sel)) return;
-    const i = board.findIndex(b => String(b.team) === String(S.team));
-    if (i < 0) return;
-    el.textContent = i === 0 ? `目前全場第 1 名` : `目前全場第 ${i + 1} 名，離第 ${i} 名差 ${board[i - 1].total - board[i].total} 分`;
+    const b = await BQ.fetchBoard(S.session);
+    if (!b || !$(sel)) return;
+    const me = b.board.find(x => x.player === S.player);
+    if (!me || !me.total) return;
+    const ahead = b.board.filter(x => x.total > me.total).pop();   // 剛好比自己高分的那一位
+    el.textContent = me.rank === 1 ? `${S.player} 號目前全場第 1 名（共 ${b.players} 人）`
+      : `${S.player} 號目前第 ${me.rank} 名（共 ${b.players} 人），離前一名差 ${ahead.total - me.total} 分`;
   }
   function renderResult(n, fresh) {
     const c = C(n), r = R[n]; stopTimer(); renderHud(); main.className = ""; main.scrollTop = 0;
@@ -639,7 +720,7 @@
         <div class="stats">${statsLine(n, r)}</div>
         <div class="sync ${!fresh && !r.synced ? "bad" : ""}" id="sync">${syncHTML(r, fresh)}</div>
         ${badge ? `<div class="pin"><i class="ph ph-${badge.icon}" aria-hidden="true"></i><span><span class="kicker">獲得徽章</span><br><b>${badge.name}</b></span></div>` : ""}
-        <p id="rank" style="margin-top:12px;color:var(--text-dim);font-size:14px"></p>
+        <p id="rank" style="margin-top:12px;color:var(--text-dim);font-size:16px"></p>
       </div>
       <div class="learn"><div class="kicker">學到了什麼</div>${c.lesson}</div>
       <div class="review">${reviewHTML(n, r)}</div>
@@ -705,25 +786,25 @@
       <div class="ticket final" id="card">
         <div class="no">MINSHIH UNIV. · 餐飲系 · 宴會管理 · ${date}</div>
         <div class="ftitle">${title}</div>
-        <div style="display:flex;align-items:center;gap:8px;font-size:14px">${BQ.shapeSVG(t, 20)}<b>${BQ.teamLabel(S.team)}</b></div>
-        <div style="display:flex;align-items:baseline;gap:10px"><span class="ftotal">${tot}</span><span style="font-size:13px;color:var(--c-ink-muted)" id="frank">總分</span></div>
+        <div style="display:flex;align-items:center;gap:8px;font-size:14px">${BQ.shapeSVG(t, 20)}<b>${meLabel()}</b></div>
+        <div style="display:flex;align-items:baseline;gap:10px"><span class="ftotal">${tot}</span><span style="font-size:16px;color:var(--c-ink-muted)" id="frank">總分</span></div>
         <div>${GAME.courses.map(c => `<div class="frow"><span>${pad(c.no)} ${c.title}</span><b>${c.kind === "soon" ? "下次開放" : (R[c.no] ? R[c.no].score : "—")}</b></div>`).join("")}</div>
         ${pins.length ? `<div class="fpins">${pins.map(b => `<span>${b.name}</span>`).join("")}</div>` : ""}
-        <div class="no">本組寫出的提示詞</div>
+        <div class="no">你寫出的提示詞</div>
         <div class="fprompt">${esc((R[P] && R[P].prompt) || "（提示詞積木那道沒有組出完整提示詞）")}</div>
-        <div class="no" style="text-align:center">— TICKET #${esc(S.session)}-${pad(S.team)} · ${BRAND} —</div>
+        <div class="no" style="text-align:center">— TICKET #${esc(S.session)}-${S.player ? pad(S.player) : "--"} · ${BRAND} —</div>
       </div>
       <p style="text-align:center;color:var(--c-muted);font-size:13px;margin-top:12px">截圖存下這張卡。上面那句提示詞，回家就能直接拿去問 AI。</p>`;
     setBar(`<button class="btn-serve" id="menu">回菜單</button>`);
     $("#menu").onclick = renderMenu;
-    BQ.fetchBoard(S.session).then(board => {
-      const el = $("#frank"); if (!board || !el) return;
-      const i = board.findIndex(b => String(b.team) === String(S.team));
-      if (i >= 0) el.textContent = `總分 · 全場第 ${i + 1} 名`;
+    BQ.fetchBoard(S.session).then(b => {
+      const el = $("#frank"); if (!b || !el) return;
+      const me = b.board.find(x => x.player === S.player);
+      if (me) el.textContent = `總分 · 全場第 ${me.rank} 名`;
     });
   }
 
   // ── 啟動 ──
   loadRes();
-  if (S.team && /^\d{4}$/.test(S.session || "")) renderMenu(); else renderEntry();
+  if (S.team && BQ.normSession(S.session)) renderMenu(); else renderEntry();
 })();

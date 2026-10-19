@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@700;900&family=JetBrains+Mono:wght@500;700;800&display=swap">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/regular/style.css">
-<link rel="stylesheet" href="theme.css?v=10">
+<link rel="stylesheet" href="theme.css?v=13">
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
 <style>
   body { overflow: hidden; }
@@ -22,7 +22,6 @@
   .qrbox svg { display: block; width: 100%; height: auto; }
   .code { font-family: var(--font-mono); font-weight: 800; font-size: clamp(56px, 6.2vw, 120px); letter-spacing: .15em; line-height: 1; margin-top: 1.5vw; color: var(--text); }
   .steps { margin-top: 1.2vw; font-size: clamp(18px, 1.5vw, 30px); color: var(--text-dim); }
-  .url { font-family: var(--font-mono); font-size: clamp(12px, .9vw, 18px); color: var(--c-muted); margin-top: .6vw; word-break: break-all; }
 
   /* 進行中：倒數 */
   .ctitle { font-family: var(--font-serif); font-weight: 900; font-size: clamp(40px, 4.6vw, 96px); line-height: 1.1; margin-top: .4vw; }
@@ -37,17 +36,28 @@
   /* 排行榜 */
   .lb-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 1vw; }
   .lb-head h2 { font-family: var(--font-serif); font-size: clamp(26px, 2.4vw, 48px); }
-  .lb { list-style: none; display: grid; gap: .7vw; }
+  .lb-head .cnt { font-family: var(--font-sans); font-size: clamp(20px, 1.6vw, 32px); font-weight: 500; color: var(--text-dim); margin-left: .6vw; }
+  .lb { list-style: none; display: grid; gap: .45vw; }
   .row { display: grid; grid-template-columns: 3.2vw 1fr auto auto; align-items: center; gap: 1.2vw;
-         padding: .9vw 1.2vw; border-radius: var(--r-panel); background: var(--panel); position: relative; will-change: transform; }
+         padding: .3vw 1.2vw; border-radius: var(--r-panel); background: var(--panel); position: relative; will-change: transform; line-height: 1.1; }
   .row .rk { font-family: var(--font-mono); font-weight: 800; font-size: clamp(22px, 2.2vw, 44px); color: var(--c-muted); }
   .row .nm { display: flex; align-items: center; gap: .8vw; font-size: clamp(22px, 2vw, 40px); font-weight: 700; min-width: 0; }
-  .row .nm .shape { width: clamp(22px, 2vw, 40px); height: clamp(22px, 2vw, 40px); }
+  .row .nm .shape { width: clamp(18px, 1.4vw, 28px); height: clamp(18px, 1.4vw, 28px); }
+  .row .pno { font-family: var(--font-mono); font-weight: 800; font-size: clamp(30px, 2.5vw, 52px); font-variant-numeric: tabular-nums; }
+  .row .tm { font-size: clamp(14px, 1.05vw, 22px); font-weight: 500; color: var(--text-dim); display: inline-flex; align-items: center; gap: .4vw; }
+  .ctrl .danger { border-color: var(--wrong); color: var(--wrong); margin-left: auto; }   /* 換行時也固定在最右邊 */
+  .confirm { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; background: rgba(10,20,38,.88); }
+  .confirm .box { background: var(--panel); border: 2px solid var(--wrong); border-radius: var(--r-panel); padding: 2.4vw; max-width: 46vw; }
+  .confirm h3 { font-size: clamp(24px, 2vw, 40px); margin-bottom: 1vw; }
+  .confirm p { font-size: clamp(16px, 1.3vw, 26px); color: var(--text-dim); }
+  .confirm .acts { display: flex; gap: 1vw; margin-top: 2vw; justify-content: flex-end; }
+  .confirm button { min-height: 52px; padding: 0 24px; border-radius: 10px; font-size: 18px; border: 1px solid var(--line); background: var(--panel); color: var(--text); }
+  .confirm button.go { background: var(--wrong); border-color: var(--wrong); color: #fff; font-weight: 700; }
   .row .cells { display: flex; gap: .4vw; }
   .row .cells span { width: clamp(14px, 1.3vw, 26px); height: clamp(14px, 1.3vw, 26px); border-radius: 4px; border: 2px solid var(--line); }
   .row .cells span.on { background: var(--c-ivory-dim); border-color: var(--c-ivory-dim); }
   .row .cells span.soon { border-style: dashed; opacity: .5; }
-  .row .tot { font-family: var(--font-mono); font-weight: 800; font-size: clamp(34px, 3.3vw, 64px); color: var(--gold-text); min-width: 4ch; text-align: right; font-variant-numeric: tabular-nums; }
+  .row .tot { font-family: var(--font-mono); font-weight: 800; font-size: clamp(30px, 2.8vw, 56px); color: var(--gold-text); min-width: 4ch; text-align: right; font-variant-numeric: tabular-nums; }
   .row .stripe { position: absolute; left: 0; top: 14%; bottom: 14%; width: 6px; border-radius: 3px; }
   .row .up { position: absolute; left: 1.2vw; top: -.6vw; font-family: var(--font-mono); font-size: clamp(12px, .9vw, 18px); font-weight: 700;
              color: var(--c-navy-900); background: var(--c-gold); border-radius: var(--r-pill); padding: 2px 10px; animation: upfade 2.6s forwards; }
@@ -66,8 +76,6 @@
   .ctrl button { min-height: 40px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel);
                  font-size: 14px; display: inline-flex; align-items: center; gap: 6px; }
   .ctrl button[aria-pressed="true"] { border-color: var(--c-ivory-dim); }
-  .ctrl .lnk { min-height: 40px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel);
-               font-size: 14px; display: inline-flex; align-items: center; gap: 6px; color: var(--text); text-decoration: none; }
   .ctrl .sep { flex: 1; }
   .ctrl.hidden { display: none; }
   .conn { font-size: 13px; color: var(--c-muted); display: inline-flex; align-items: center; gap: 6px; }
@@ -78,7 +86,7 @@
 <div class="stage">
   <section class="left" id="left"></section>
   <section class="right">
-    <div class="lb-head"><h2>即時排行</h2><span class="k" id="meta"></span></div>
+    <div class="lb-head"><h2>即時排行 <span class="cnt" id="cnt"></span></h2><span class="k" id="meta"></span></div>
     <ol class="lb" id="lb" aria-label="即時排行榜"></ol>
   </section>
 </div>
@@ -86,7 +94,6 @@
 <div class="ctrl" id="ctrl">
   <button id="bQR"><i class="ph ph-qr-code"></i>入場 QR（0）</button>
   <span id="courseBtns" style="display:contents"></span>
-  <a id="bLine" href="#" class="lnk"><i class="ph ph-factory"></i>數位生產線</a>
   <button id="bPlus"><i class="ph ph-plus"></i>30 秒（+）</button>
   <button id="bPause"><i class="ph ph-pause"></i>暫停（空白鍵）</button>
   <span class="sep"></span>
@@ -94,10 +101,17 @@
   <button id="bTheme" aria-pressed="false"><i class="ph ph-sun"></i>燈亮模式（L）</button>
   <button id="bSound" aria-pressed="false"><i class="ph ph-speaker-slash"></i>音效（M）</button>
   <button id="bHide">隱藏控制列（H）</button>
+  <button id="bReset" class="danger"><i class="ph ph-arrow-counter-clockwise"></i>新的一堂課</button>
 </div>
+<div class="confirm" id="confirm" hidden role="dialog" aria-modal="true" aria-labelledby="cfTitle"><div class="box">
+  <h3 id="cfTitle"></h3>
+  <p>學生的成績和編號都會清掉（下一位入座重新從 1 號開始），清掉就救不回來。</p>
+  <p id="cfMsg" style="margin-top:.8vw"></p>
+  <div class="acts"><button id="cfNo">取消</button><button class="go" id="cfYes">確定清掉</button></div>
+</div></div>
 
-<script src="game-data.js?v=10"></script>
-<script src="common.js?v=10"></script>
+<script src="game-data.js?v=13"></script>
+<script src="common.js?v=13"></script>
 <script>
 (function () {
   const $ = s => document.querySelector(s);
@@ -105,16 +119,13 @@
   const RM = matchMedia("(prefers-reduced-motion: reduce)").matches;
   const PLAY = GAME.courses.filter(c => c.kind !== "soon");
 
-  // 場次碼：網址沒帶就產生一組 4 位數並寫回網址（重新整理不會換碼）
+  // 場次碼：1、2、3…；網址沒帶（或帶錯）就是場次 1，寫回網址讓重新整理也一樣
   const qs = new URLSearchParams(location.search);
-  let session = (qs.get("s") || "").replace(/\D/g, "").slice(0, 4);
-  if (session.length !== 4) {
-    session = String(Math.floor(1000 + Math.random() * 9000));
-    qs.set("s", session); history.replaceState(null, "", "?" + qs.toString());
-  }
-  const studentURL = new URL("index.html?s=" + session, location.href).href;
-  $("#meta").textContent = "場次 " + session + " · James Wu｜AI 造王者";
-  $("#bLine").href = "line.html?s=" + session;
+  const session = BQ.normSession(qs.get("s")) || "1";
+  if (qs.get("s") !== session) { qs.set("s", session); history.replaceState(null, "", "?" + qs.toString()); }
+  const studentURL = BQ.studentURL(session);   // QR 一律連正式網址，從本機檔案打開投影幕也一樣
+  const META = "場次 " + session + " · James Wu｜AI 造王者";
+  $("#meta").textContent = META;
 
   // ── 左側：待機 QR／關卡倒數 ──
   let cd = null; // { course, end, total, paused, remain }
@@ -125,8 +136,7 @@
     $("#left").innerHTML = `<div class="k">掃碼入座</div>
       <div class="qrbox" style="margin-top:1vw">${svg}</div>
       <div class="code" aria-label="場次碼 ${session.split("").join(" ")}">${session}</div>
-      <div class="steps">手機掃 QR → 選你們的桌 → 輸入場次碼</div>
-      <div class="url">${BQ.esc(studentURL)}</div>`;
+      <div class="steps">手機掃 QR → 選你們的桌 → 記住你的號碼</div>`;
   }
   function startCourse(no) {
     const c = GAME.courses.find(x => x.no === no);
@@ -161,23 +171,26 @@
   function cellsHTML(levels) {
     return GAME.courses.map(c => c.kind === "soon" ? `<span class="soon"></span>` : `<span class="${levels[c.no] != null ? "on" : ""}"></span>`).join("");
   }
-  function render(board) {
+  function render(data) {
+    const board = data.board.filter(b => b.total > 0).slice(0, 10);
+    $("#cnt").textContent = `共 ${data.players} 人`;
     const json = JSON.stringify(board);
     if (json === lastJSON) return;
     lastJSON = json;
     const lb = $("#lb");
-    if (!board.length) { lb.innerHTML = `<li class="empty">等各桌出第一道菜…</li>`; rows.clear(); return; }
+    rows.forEach((el, k) => { if (!board.some(b => String(b.player) === k)) { el.remove(); rows.delete(k); } });   // 掉出前 10 名的拿掉
+    if (!board.length) { lb.innerHTML = `<li class="empty">${data.players ? "等大家出第一道菜…" : "等大家入座…"}</li>`; rows.clear(); lastRank = {}; lastTotal = {}; return; }
     const empty = lb.querySelector(".empty"); if (empty) empty.remove();
     const before = new Map(); rows.forEach((el, k) => before.set(k, el.getBoundingClientRect().top));
     let gained = false, overtook = false;
     board.forEach((b, i) => {
-      const key = String(b.team), t = BQ.team(b.team);
+      const key = String(b.player), t = BQ.team(b.team);
       if (!t) return;
       let el = rows.get(key);
       if (!el) { el = document.createElement("li"); el.className = "row"; rows.set(key, el); }
-      el.setAttribute("aria-label", `第 ${i + 1} 名，${BQ.teamLabel(b.team)}，${b.total} 分`);
-      el.innerHTML = `<span class="stripe" style="background:${t.color}"></span><span class="rk">${i + 1}</span>
-        <span class="nm">${BQ.shapeSVG(t)}<span>${BQ.teamLabel(b.team)}</span></span>
+      el.setAttribute("aria-label", `第 ${b.rank} 名，${b.player} 號，${BQ.teamLabel(b.team)}，${b.total} 分`);
+      el.innerHTML = `<span class="stripe" style="background:${t.color}"></span><span class="rk">${b.rank}</span>
+        <span class="nm"><span class="pno">${b.player} 號</span><span class="tm">${BQ.shapeSVG(t)}${t.name}</span></span>
         <span class="cells" aria-hidden="true">${cellsHTML(b.levels)}</span><span class="tot">${b.total}</span>`;
       if (lastRank[key] != null && i < lastRank[key]) {
         overtook = true;
@@ -196,10 +209,13 @@
     });
     if (overtook) { tone(1320, .35); setTimeout(() => tone(1320, .35), 180); } else if (gained) tone(1320, .5);
   }
+  let polling = false;   // 上一次還沒回來就不發新的，免得舊資料晚到把排行榜蓋回去
   async function poll() {
-    const board = await BQ.fetchBoard(session);
+    if (polling) return;
+    polling = true;
+    const data = await BQ.fetchBoard(session).finally(() => { polling = false; });
     const conn = $("#conn");
-    if (board) { conn.className = "conn"; conn.innerHTML = `<i class="ph ph-check"></i>連線中`; render(board); }
+    if (data) { conn.className = "conn"; conn.innerHTML = `<i class="ph ph-check"></i>連線中`; render(data); }
     else { conn.className = "conn bad"; conn.innerHTML = `<i class="ph ph-x"></i>連不到計分伺服器（檢查 n8n 與 tunnel）`; }
   }
   poll(); setInterval(poll, 3000);
@@ -213,6 +229,21 @@
     g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(.25, t + .01); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
     o.start(t); o.stop(t + dur + .05);
   }
+
+  // ── 新的一堂課：要按兩次才清（先跳確認框），沒有鍵盤快捷鍵，避免誤觸 ──
+  const cf = $("#confirm");
+  const closeCf = () => { cf.hidden = true; $("#bReset").focus(); };
+  $("#bReset").onclick = () => {
+    $("#cfTitle").textContent = `確定清掉場次 ${session} 的全部成績和編號？`;
+    $("#cfMsg").textContent = ""; $("#cfYes").disabled = false; cf.hidden = false; $("#cfNo").focus();
+  };
+  $("#cfNo").onclick = closeCf;
+  $("#cfYes").onclick = async () => {
+    $("#cfYes").disabled = true; $("#cfMsg").textContent = "清除中…";
+    const r = await BQ.resetSession(session);
+    if (!r) { $("#cfMsg").textContent = "不確定有沒有清掉（連不到計分伺服器）。檢查 n8n 和 tunnel 後再按一次，重按沒關係。"; $("#cfYes").disabled = false; return; }
+    cf.hidden = true; lastJSON = ""; showLobby(); render({ board: [], players: 0 }); poll();   // 先清空畫面，不等下一次輪詢
+  };
 
   // ── 老師控制 ──
   PLAY.forEach(c => {
@@ -246,6 +277,7 @@
   document.addEventListener("keydown", e => {
     if (e.target.tagName === "INPUT") return;
     const k = e.key.toLowerCase();
+    if (!cf.hidden) { if (k === "escape") closeCf(); return; }   // 確認框開著時，其他快捷鍵都不動
     if (k === "0") showLobby();
     else if (PLAY.some(c => String(c.no) === k)) startCourse(Number(k));
     else if (k === "+" || k === "=") plus();
