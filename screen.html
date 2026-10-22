@@ -8,43 +8,59 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@700;900&family=JetBrains+Mono:wght@500;700;800&display=swap">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/regular/style.css">
-<link rel="stylesheet" href="theme.css?v=18">
+<link rel="stylesheet" href="theme.css?v=19">
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
 <style>
   body { overflow: hidden; }
-  .stage { position: relative; z-index: 1; height: 100vh; display: grid; grid-template-columns: 40fr 60fr; gap: 3vw; padding: 3vw 3vw 6vw; }
-  .left { display: flex; flex-direction: column; justify-content: center; min-width: 0; }
-  .right { display: flex; flex-direction: column; min-width: 0; }
-  .k { font-family: var(--font-mono); letter-spacing: .12em; text-transform: uppercase; color: var(--c-muted); font-size: clamp(14px, 1.15vw, 24px); }
+  /* 一個畫面三欄同時看：分組對抗｜個人排行｜掃碼入座（不用切換）*/
+  .stage { position: relative; z-index: 1; height: 100vh; display: grid; grid-template-columns: 28fr 47fr 25fr; gap: 2.2vw; padding: 2.4vw 2.4vw 5.4vw; }
+  .col { display: flex; flex-direction: column; min-width: 0; }
+  .col-h { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: .8vw; margin-bottom: 1vw; }
+  .col-h h2 { font-family: var(--font-serif); font-size: clamp(28px, 2.3vw, 46px); }
+  .col-h .sub { font-size: clamp(28px, 1.5vw, 30px); font-weight: 500; color: var(--text-dim); }
 
-  /* 待機：QR */
-  .qrbox { width: min(26vw, 52vh); padding: 1.2vw; background: var(--c-ivory); border-radius: var(--r-panel); }
+  /* 右欄：QR 一直在 */
+  .qrcol { align-items: center; text-align: center; }
+  .qrcol .col-h { align-self: stretch; justify-content: center; }
+  .qrbox { width: min(100%, 44vh); padding: 1vw; background: var(--c-ivory); border-radius: var(--r-panel); }
   .qrbox svg { display: block; width: 100%; height: auto; }
-  .code { font-family: var(--font-mono); font-weight: 800; font-size: clamp(56px, 6.2vw, 120px); letter-spacing: .15em; line-height: 1; margin-top: 1.5vw; color: var(--text); }
-  .steps { margin-top: 1.2vw; font-size: clamp(18px, 1.5vw, 30px); color: var(--text-dim); }
+  .code { font-family: var(--font-mono); font-weight: 800; font-size: clamp(56px, 5.6vw, 110px); letter-spacing: .15em; line-height: 1; margin-top: 1.2vw; color: var(--text); }
+  .code small { display: block; font-family: var(--font-sans); font-size: clamp(28px, 1.5vw, 30px); font-weight: 500; letter-spacing: 0; color: var(--text-dim); margin-bottom: .4vw; }
+  .steps span, .meta span { display: inline-block; }   /* 窄螢幕只在箭頭、分隔號斷行 */
+  .steps { margin-top: 1vw; font-size: clamp(28px, 1.5vw, 30px); line-height: 1.4; color: var(--text-dim); }
+  .meta { margin-top: auto; font-size: clamp(28px, 1.5vw, 30px); color: var(--c-muted); }
 
-  /* 進行中：倒數 */
-  .ctitle { font-family: var(--font-serif); font-weight: 900; font-size: clamp(40px, 4.6vw, 96px); line-height: 1.1; margin-top: .4vw; }
-  .staff { font-size: clamp(16px, 1.4vw, 28px); color: var(--text-dim); margin-top: .4vw; }
-  .count { font-family: var(--font-mono); font-weight: 800; font-size: clamp(96px, 11vw, 220px); line-height: 1; margin-top: 2vw; font-variant-numeric: tabular-nums; }
-  .count.warn { color: var(--wrong); }
-  .count.paused { opacity: .45; }
-  .bar { height: 10px; background: var(--line); border-radius: 5px; overflow: hidden; margin-top: 1.2vw; }
-  .bar i { display: block; height: 100%; background: var(--c-ivory-dim); transform-origin: left; }
-  .bar.warn i { background: var(--wrong); }
-
-  /* 排行榜 */
-  .lb-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 1vw; }
-  .lb-head h2 { font-family: var(--font-serif); font-size: clamp(26px, 2.4vw, 48px); }
-  .lb-head .cnt { font-family: var(--font-sans); font-size: clamp(20px, 1.6vw, 32px); font-weight: 500; color: var(--text-dim); margin-left: .6vw; }
+  /* 個人排行 */
   .lb { list-style: none; display: grid; gap: .45vw; }
-  .row { display: grid; grid-template-columns: 3.2vw 1fr auto auto; align-items: center; gap: 1.2vw;
-         padding: .3vw 1.2vw; border-radius: var(--r-panel); background: var(--panel); position: relative; will-change: transform; line-height: 1.1; }
-  .row .rk { font-family: var(--font-mono); font-weight: 800; font-size: clamp(22px, 2.2vw, 44px); color: var(--c-muted); }
-  .row .nm { display: flex; align-items: center; gap: .8vw; font-size: clamp(22px, 2vw, 40px); font-weight: 700; min-width: 0; }
-  .row .nm .shape { width: clamp(18px, 1.4vw, 28px); height: clamp(18px, 1.4vw, 28px); }
-  .row .pno { font-family: var(--font-mono); font-weight: 800; font-size: clamp(30px, 2.5vw, 52px); font-variant-numeric: tabular-nums; }
-  .row .tm { font-size: clamp(14px, 1.05vw, 22px); font-weight: 500; color: var(--text-dim); display: inline-flex; align-items: center; gap: .4vw; }
+  .row { display: grid; grid-template-columns: auto 1fr auto auto; align-items: center; gap: 1vw;
+         padding: .3vw 1vw; border-radius: var(--r-panel); background: var(--panel); position: relative; will-change: transform; line-height: 1.1; }
+  .row .rk { font-family: var(--font-mono); font-weight: 800; font-size: clamp(28px, 2vw, 40px); color: var(--c-muted); min-width: 2ch; }   /* 第 10 名的兩位數不擠到號碼 */
+  .row .nm { display: flex; align-items: center; gap: .8vw; min-width: 0; }
+  .row .nm .shape { width: clamp(22px, 1.4vw, 28px); height: clamp(22px, 1.4vw, 28px); }
+  .row .pno { font-family: var(--font-mono); font-weight: 800; font-size: clamp(30px, 2.4vw, 48px); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .row .tm { font-size: clamp(28px, 1.5vw, 30px); font-weight: 500; color: var(--text-dim); display: inline-flex; align-items: center; gap: .4vw; white-space: nowrap; }
+  .row .cells { display: flex; gap: .3vw; }
+  .row .cells span { width: clamp(14px, 1vw, 20px); height: clamp(14px, 1vw, 20px); border-radius: 4px; border: 2px solid var(--line); }
+  .row .cells span.on { background: var(--c-ivory-dim); border-color: var(--c-ivory-dim); }
+  .row .cells span.soon { border-style: dashed; opacity: .5; }
+  .row .tot { font-family: var(--font-mono); font-weight: 800; font-size: clamp(32px, 2.6vw, 52px); color: var(--gold-text); min-width: 3ch; text-align: right; font-variant-numeric: tabular-nums; }
+  .row .stripe { position: absolute; left: 0; top: 14%; bottom: 14%; width: 6px; border-radius: 3px; }
+  .row .up { position: absolute; left: 1vw; top: -.6vw; font-family: var(--font-mono); font-size: clamp(12px, .9vw, 18px); font-weight: 700;
+             color: var(--c-navy-900); background: var(--c-ivory); border-radius: var(--r-pill); padding: 2px 10px; animation: upfade 2.6s forwards; }
+  @keyframes upfade { 0%,75% { opacity: 1; } 100% { opacity: 0; } }
+  .empty { color: var(--c-muted); font-size: clamp(28px, 1.6vw, 32px); padding: 2vw 0; }
+
+  /* 分組對抗（組員平均分）*/
+  .teams { list-style: none; display: grid; gap: .45vw; }
+  .trow { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: .9vw; padding: .5vw 1vw;
+          border-radius: var(--r-panel); background: var(--panel); position: relative; line-height: 1.1; }
+  .trow .rk { font-family: var(--font-mono); font-weight: 800; font-size: clamp(28px, 2vw, 40px); color: var(--c-muted); min-width: 1ch; }
+  .trow .nm { display: flex; align-items: center; gap: .6vw; font-size: clamp(28px, 2vw, 40px); font-weight: 700; min-width: 0; white-space: nowrap; }
+  .trow .nm .shape { width: clamp(22px, 1.8vw, 36px); height: clamp(22px, 1.8vw, 36px); }
+  .trow .nm small { font-size: clamp(28px, 1.5vw, 30px); font-weight: 500; color: var(--text-dim); }
+  .trow .avg { font-family: var(--font-mono); font-weight: 800; font-size: clamp(30px, 2.6vw, 52px); color: var(--gold-text); font-variant-numeric: tabular-nums; }
+  .trow .stripe { position: absolute; left: 0; top: 14%; bottom: 14%; width: 6px; border-radius: 3px; }
+
   .ctrl .danger { border-color: var(--wrong); color: var(--wrong); margin-left: auto; }   /* 換行時也固定在最右邊 */
   .confirm { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; background: rgba(10,20,38,.88); }
   .confirm .box { background: var(--panel); border: 2px solid var(--wrong); border-radius: var(--r-panel); padding: 2.4vw; max-width: 46vw; }
@@ -53,16 +69,6 @@
   .confirm .acts { display: flex; gap: 1vw; margin-top: 2vw; justify-content: flex-end; }
   .confirm button { min-height: 52px; padding: 0 24px; border-radius: 10px; font-size: 18px; border: 1px solid var(--line); background: var(--panel); color: var(--text); }
   .confirm button.go { background: var(--wrong); border-color: var(--wrong); color: #fff; font-weight: 700; }
-  .row .cells { display: flex; gap: .4vw; }
-  .row .cells span { width: clamp(14px, 1.3vw, 26px); height: clamp(14px, 1.3vw, 26px); border-radius: 4px; border: 2px solid var(--line); }
-  .row .cells span.on { background: var(--c-ivory-dim); border-color: var(--c-ivory-dim); }
-  .row .cells span.soon { border-style: dashed; opacity: .5; }
-  .row .tot { font-family: var(--font-mono); font-weight: 800; font-size: clamp(30px, 2.8vw, 56px); color: var(--gold-text); min-width: 4ch; text-align: right; font-variant-numeric: tabular-nums; }
-  .row .stripe { position: absolute; left: 0; top: 14%; bottom: 14%; width: 6px; border-radius: 3px; }
-  .row .up { position: absolute; left: 1.2vw; top: -.6vw; font-family: var(--font-mono); font-size: clamp(12px, .9vw, 18px); font-weight: 700;
-             color: var(--c-navy-900); background: var(--c-gold); border-radius: var(--r-pill); padding: 2px 10px; animation: upfade 2.6s forwards; }
-  @keyframes upfade { 0%,75% { opacity: 1; } 100% { opacity: 0; } }
-  .empty { color: var(--c-muted); font-size: clamp(20px, 1.6vw, 32px); padding: 2vw 0; }
 
   /* 頒獎畫面：獎名＋提示 → 揭曉得主（不顯示得獎條件）*/
   .awards { position: fixed; inset: 0; z-index: 85; display: grid; place-items: center; background: var(--bg); color: var(--text); }   /* 跟著燈亮模式換色 */
@@ -78,30 +84,13 @@
   .awards .who.none { font-family: var(--font-sans); font-size: clamp(40px, 3.6vw, 72px); color: var(--c-muted); }
   .awards .tap { margin-top: 2vw; font-size: clamp(16px, 1.1vw, 22px); color: var(--c-muted); }
 
-  /* 左側：分組對抗（組員平均分）*/
-  .teams { list-style: none; display: grid; gap: .45vw; margin-top: 1vw; }
-  .trow { display: grid; grid-template-columns: 2.6vw 1fr auto; align-items: center; gap: 1vw; padding: .5vw 1vw;
-          border-radius: var(--r-panel); background: var(--panel); position: relative; line-height: 1.1; }
-  .trow .rk { font-family: var(--font-mono); font-weight: 800; font-size: clamp(28px, 2vw, 40px); color: var(--c-muted); }
-  .trow .nm { display: flex; align-items: center; gap: .7vw; font-size: clamp(28px, 2vw, 40px); font-weight: 700; min-width: 0; }
-  .trow .nm .shape { width: clamp(22px, 1.8vw, 36px); height: clamp(22px, 1.8vw, 36px); }
-  .trow .nm small { font-size: clamp(16px, 1.1vw, 22px); font-weight: 500; color: var(--text-dim); }
-  .trow .avg { font-family: var(--font-mono); font-weight: 800; font-size: clamp(30px, 2.6vw, 52px); color: var(--gold-text); font-variant-numeric: tabular-nums; }
-  .trow .stripe { position: absolute; left: 0; top: 14%; bottom: 14%; width: 6px; border-radius: 3px; }
-
-  /* 收單 */
-  .closing { position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; background: rgba(10,20,38,.92);
-             font-family: var(--font-serif); font-weight: 900; font-size: clamp(80px, 10vw, 200px); color: var(--c-ivory); }
-  [data-theme="light"] .closing { background: rgba(245,239,225,.94); color: var(--c-navy-900); }
-
   /* 老師控制列（投影時可按 H 隱藏）*/
-  .ctrl { position: fixed; left: 3vw; right: 3vw; bottom: 1.2vw; z-index: 60; display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+  .ctrl { position: fixed; left: 2.4vw; right: 2.4vw; bottom: 1.2vw; z-index: 60; display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
           opacity: .55; transition: opacity var(--t-ui); }
   .ctrl:hover, .ctrl:focus-within { opacity: 1; }
   .ctrl button { min-height: 40px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel);
                  font-size: 14px; display: inline-flex; align-items: center; gap: 6px; }
   .ctrl button[aria-pressed="true"] { border-color: var(--c-ivory-dim); }
-  .ctrl .sep { flex: 1; }
   .ctrl.hidden { display: none; }
   .conn { font-size: 13px; color: var(--c-muted); display: inline-flex; align-items: center; gap: 6px; }
   .conn.bad { color: var(--wrong); }
@@ -109,23 +98,28 @@
 </head>
 <body>
 <div class="stage">
-  <section class="left" id="left"></section>
-  <section class="right">
-    <div class="lb-head"><h2>即時排行 <span class="cnt" id="cnt"></span></h2><span class="k" id="meta"></span></div>
-    <ol class="lb" id="lb" aria-label="即時排行榜"></ol>
+  <section class="col">
+    <div class="col-h"><h2>分組對抗</h2><span class="sub">組員平均分</span></div>
+    <ol class="teams" id="teams" aria-label="分組排名"></ol>
+  </section>
+  <section class="col">
+    <div class="col-h"><h2>個人排行</h2><span class="sub" id="cnt"></span></div>
+    <ol class="lb" id="lb" aria-label="個人即時排行榜"></ol>
+  </section>
+  <section class="col qrcol">
+    <div class="col-h"><h2>掃碼入座</h2></div>
+    <div class="qrbox" id="qr"></div>
+    <div class="code" id="code"></div>
+    <div class="steps"><span>掃 QR</span> <span>→ 選你們的桌</span> <span>→ 記住你的號碼</span></div>
+    <div class="meta"><span>James Wu</span>｜<span>AI 造王者</span></div>
   </section>
 </div>
 
 <div class="ctrl" id="ctrl">
-  <button id="bQR"><i class="ph ph-qr-code"></i>QR／分組（0）</button>
-  <span id="courseBtns" style="display:contents"></span>
-  <button id="bPlus"><i class="ph ph-plus"></i>30 秒（+）</button>
-  <button id="bPause"><i class="ph ph-pause"></i>暫停（空白鍵）</button>
-  <span class="sep"></span>
   <span class="conn" id="conn"><i class="ph ph-check"></i>連線中</span>
+  <button id="bAward"><i class="ph ph-trophy"></i>頒獎（A）</button>
   <button id="bTheme" aria-pressed="false"><i class="ph ph-sun"></i>燈亮模式（L）</button>
   <button id="bSound" aria-pressed="false"><i class="ph ph-speaker-slash"></i>音效（M）</button>
-  <button id="bAward"><i class="ph ph-trophy"></i>頒獎（A）</button>
   <button id="bHide">隱藏控制列（H）</button>
   <button id="bReset" class="danger"><i class="ph ph-arrow-counter-clockwise"></i>新的一堂課</button>
 </div>
@@ -137,88 +131,41 @@
   <div class="acts"><button id="cfNo">取消</button><button class="go" id="cfYes">確定清掉</button></div>
 </div></div>
 
-<script src="game-data.js?v=18"></script>
-<script src="common.js?v=18"></script>
+<script src="game-data.js?v=19"></script>
+<script src="common.js?v=19"></script>
 <script>
 (function () {
   const $ = s => document.querySelector(s);
-  const pad = n => String(n).padStart(2, "0");
   const RM = matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const PLAY = GAME.courses.filter(c => c.kind !== "soon");
 
   // 場次碼：1、2、3…；網址沒帶（或帶錯）就是場次 1，寫回網址讓重新整理也一樣
   const qs = new URLSearchParams(location.search);
   const session = BQ.normSession(qs.get("s")) || "1";
   if (qs.get("s") !== session) { qs.set("s", session); history.replaceState(null, "", "?" + qs.toString()); }
   const studentURL = BQ.studentURL(session);   // QR 一律連正式網址，從本機檔案打開投影幕也一樣
-  const META = "場次 " + session + " · James Wu｜AI 造王者";
-  $("#meta").textContent = META;
 
-  // ── 左側：待機 QR／分組對抗／關卡倒數 ──
-  let cd = null; // { course, end, total, paused, remain }
-  let leftMode = "qr", lastData = null, lastTeamsJSON = "";
-  function showLobby() {
-    cd = null; leftMode = "qr";
-    const qr = qrcode(0, "M"); qr.addData(studentURL); qr.make();
-    const svg = qr.createSvgTag(6, 0).replace(/ width="\d+px"/, "").replace(/ height="\d+px"/, "");
-    $("#left").innerHTML = `<div class="k">掃碼入座</div>
-      <div class="qrbox" style="margin-top:1vw">${svg}</div>
-      <div class="code" aria-label="場次碼 ${session.split("").join(" ")}">${session}</div>
-      <div class="steps">手機掃 QR → 選你們的桌 → 記住你的號碼</div>`;
-  }
-  // 分組對抗：同桌組員平均分（common.js 的 BQ.rankTeams，有測試）
-  function showTeams() {
-    cd = null; leftMode = "teams"; lastTeamsJSON = "";
-    renderTeams();
-  }
+  // ── 右欄：QR＋場次碼，整堂課一直在 ──
+  const qr = qrcode(0, "M"); qr.addData(studentURL); qr.make();
+  $("#qr").innerHTML = qr.createSvgTag(6, 0).replace(/ width="\d+px"/, "").replace(/ height="\d+px"/, "");
+  $("#code").innerHTML = `<small>場次碼</small>${session}`;
+  $("#code").setAttribute("aria-label", "場次碼 " + session.split("").join(" "));
+
+  // ── 左欄：分組對抗，同桌組員平均分（common.js 的 BQ.rankTeams，有測試）──
+  let lastData = null, lastTeamsJSON = "";
   function renderTeams() {
-    if (leftMode !== "teams") return;
     const list = lastData ? BQ.rankTeams(lastData.board) : [];
     const json = JSON.stringify(list);
-    if (json === lastTeamsJSON && $("#teams")) return;   // 沒變就不動畫面
+    if (json === lastTeamsJSON) return;   // 沒變就不動畫面
     lastTeamsJSON = json;
-    $("#left").innerHTML = `<div class="k">分組對抗 · 組員平均分</div>
-      <ol class="teams" id="teams" aria-label="分組排名">${list.length ? list.map(x => {
-        const t = BQ.team(x.team); if (!t) return "";
-        return `<li class="trow" aria-label="第 ${x.rank} 名，${BQ.teamLabel(x.team)}，${x.members} 人，平均 ${x.avg} 分">
-          <span class="stripe" style="background:${t.color}"></span><span class="rk">${x.rank}</span>
-          <span class="nm">${BQ.shapeSVG(t)}<span>${t.name}</span><small>${x.members} 人</small></span><span class="avg">${x.avg}</span></li>`;
-      }).join("") : `<li class="empty">等大家入座…</li>`}</ol>`;
-  }
-  // 倒數還沒結束時按 0 不動作，免得誤按（0 跟 1 相鄰）把倒數弄掉
-  const toggleLeft = () => { if (leftMode === "countdown" && cd && !cd.closed) return; leftMode === "qr" ? showTeams() : showLobby(); };
-  function startCourse(no) {
-    const c = GAME.courses.find(x => x.no === no);
-    leftMode = "countdown";
-    $("#bPause").innerHTML = `<i class="ph ph-pause"></i>暫停（空白鍵）`;
-    cd = { course: c, total: c.seconds, end: Date.now() + c.seconds * 1000, paused: false, remain: c.seconds * 1000, closed: false };
-    $("#left").innerHTML = `<div class="k">COURSE ${pad(c.no)} · ${c.dish}</div>
-      <div class="ctitle">${c.title}</div>
-      <div class="staff">出任務的是 AI ${c.staff}</div>
-      <div class="count" id="count" role="timer"></div>
-      <div class="bar" id="pbar"><i></i></div>`;
-    tick();
-  }
-  function tick() {
-    if (!cd) return;
-    const remain = cd.paused ? cd.remain : Math.max(0, cd.end - Date.now());
-    const s = Math.ceil(remain / 1000);
-    const el = $("#count"); if (!el) return;
-    el.textContent = `${Math.floor(s / 60)}:${pad(s % 60)}`;
-    el.classList.toggle("warn", s <= 30); el.classList.toggle("paused", cd.paused);
-    $("#pbar").classList.toggle("warn", s <= 30);
-    $("#pbar i").style.transform = `scaleX(${remain / (cd.total * 1000)})`;
-    if (s <= 0 && !cd.closed) { cd.closed = true; closing(); }
-  }
-  setInterval(tick, 250);
-  function closing() {
-    tone(220, .5, "triangle");
-    const el = document.createElement("div"); el.className = "closing"; el.textContent = "收單";
-    document.body.appendChild(el); setTimeout(() => el.remove(), 1400);
-    setTimeout(() => { if (leftMode === "countdown" && cd && cd.closed) showTeams(); }, 5000);   // 收單 5 秒後回到分組對抗
+    $("#teams").innerHTML = list.length ? list.map(x => {
+      const t = BQ.team(x.team); if (!t) return "";
+      return `<li class="trow" aria-label="第 ${x.rank} 名，${BQ.teamLabel(x.team)}，${x.members} 人，平均 ${x.avg} 分">
+        <span class="stripe" style="background:${t.color}"></span><span class="rk">${x.rank}</span>
+        <span class="nm">${BQ.shapeSVG(t)}<span>${t.name}</span><small>${x.members} 人</small></span><span class="avg">${x.avg}</span></li>`;
+    }).join("") : `<li class="empty">等大家入座…</li>`;
   }
 
-  // ── 右側：排行榜（資料沒變就不動畫面；有變才用 FLIP 換位置）──
+  // ── 中欄：個人排行前 10 名（資料沒變就不動畫面；有變才用 FLIP 換位置）──
   const rows = new Map(); let lastJSON = "", lastRank = {}, lastTotal = {};
   function cellsHTML(levels) {
     return GAME.courses.map(c => c.kind === "soon" ? `<span class="soon"></span>` : `<span class="${levels[c.no] != null ? "on" : ""}"></span>`).join("");
@@ -226,7 +173,7 @@
   function render(data) {
     lastData = data; renderTeams();
     const board = data.board.filter(b => b.total > 0).slice(0, 10);
-    $("#cnt").textContent = `共 ${data.players} 人`;
+    const cnt = `共 ${data.players} 人`; if ($("#cnt").textContent !== cnt) $("#cnt").textContent = cnt;
     const json = JSON.stringify(board);
     if (json === lastJSON) return;
     lastJSON = json;
@@ -271,7 +218,6 @@
     if (data) { conn.className = "conn"; conn.innerHTML = `<i class="ph ph-check"></i>連線中`; render(data); }
     else { conn.className = "conn bad"; conn.innerHTML = `<i class="ph ph-x"></i>連不到計分伺服器（檢查 n8n 與 tunnel）`; }
   }
-  poll(); setInterval(poll, 3000);
 
   // ── 音效：服務鈴，用 Web Audio 即時合成（要先按一次「音效」才會響，瀏覽器規定）──
   let ac = null, soundOn = false;
@@ -296,7 +242,7 @@
     const r = await BQ.resetSession(session);
     if (!r) { $("#cfMsg").textContent = "不確定有沒有清掉（連不到計分伺服器）。檢查 n8n 和 tunnel 後再按一次，重按沒關係。"; $("#cfYes").disabled = false; return; }
     cf.hidden = true; lastJSON = ""; awList = [];   // 頒獎名單也清掉，免得新班按 A 秀出上一班的得主
-    showLobby(); render({ board: [], players: 0 }); poll();   // 先清空畫面，不等下一次輪詢
+    render({ board: [], players: 0 }); poll();   // 先清空畫面，不等下一次輪詢
   };
 
   // ── 頒獎：打開那一刻把名單算定（common.js 的 BQ.pickAwards，有測試）；每個獎按兩下：先猜、再揭曉 ──
@@ -318,7 +264,7 @@
   function awardStep() {
     if (aw.hidden) {
       if (awList.length) { aw.hidden = false; drawAward(); return; }   // Esc 關掉後再按 A：從剛剛那個獎接著
-      if (!lastData) { $("#conn").className = "conn bad"; $("#conn").innerHTML = `<i class="ph ph-x"></i>還沒有成績資料，等右下角顯示「連線中」再按 A`; return; }
+      if (!lastData) { $("#conn").className = "conn bad"; $("#conn").innerHTML = `<i class="ph ph-x"></i>還沒有成績資料，等左下角顯示「連線中」再按 A`; return; }
       awList = BQ.pickAwards(lastData.board); awIdx = 0; awShown = false; aw.hidden = false; drawAward(); return;
     }
     if (!awShown) { awShown = true; drawAward(); return; }
@@ -329,19 +275,6 @@
   aw.onclick = awardStep;
 
   // ── 老師控制 ──
-  PLAY.forEach(c => {
-    const b = document.createElement("button");
-    b.innerHTML = `<i class="ph ph-${c.icon}"></i>第 ${c.no} 道 ${c.title}（${c.no}）`;
-    b.onclick = () => startCourse(c.no);
-    $("#courseBtns").appendChild(b);
-  });
-  const plus = () => { if (!cd) return; if (cd.paused) cd.remain += 30000; else cd.end += 30000; cd.total += 30; cd.closed = false; tick(); };
-  const pause = () => {
-    if (!cd) return;
-    if (cd.paused) { cd.end = Date.now() + cd.remain; cd.paused = false; $("#bPause").innerHTML = `<i class="ph ph-pause"></i>暫停（空白鍵）`; }
-    else { cd.remain = Math.max(0, cd.end - Date.now()); cd.paused = true; $("#bPause").innerHTML = `<i class="ph ph-play"></i>繼續（空白鍵）`; }
-    tick();
-  };
   const theme = () => {
     const light = document.documentElement.dataset.theme !== "light";
     document.documentElement.dataset.theme = light ? "light" : "dark";
@@ -355,25 +288,21 @@
     if (soundOn) tone(1320, .4);
   };
   const hide = () => $("#ctrl").classList.toggle("hidden");
-  $("#bQR").onclick = toggleLeft; $("#bPlus").onclick = plus; $("#bPause").onclick = pause;
   $("#bTheme").onclick = theme; $("#bSound").onclick = sound; $("#bHide").onclick = hide;
   document.addEventListener("keydown", e => {
     if (e.target.tagName === "INPUT") return;
     const k = e.key.toLowerCase();
     if (!cf.hidden) { if (k === "escape") closeCf(); return; }   // 確認框開著時，其他快捷鍵都不動
     if (!aw.hidden) { if (k === "escape") aw.hidden = true; else if (["a", " ", "enter", "arrowright", "pagedown"].includes(k)) { e.preventDefault(); awardStep(); } return; }   // pagedown＝簡報筆
-    if (k === "a") { awardStep(); return; }
-    if (k === "0") toggleLeft();
-    else if (PLAY.some(c => String(c.no) === k)) startCourse(Number(k));
-    else if (k === "+" || k === "=") plus();
-    else if (k === " ") { e.preventDefault(); pause(); }
+    if (k === "a") awardStep();
     else if (k === "l") theme();
     else if (k === "m") sound();
     else if (k === "h") hide();
   });
 
   if (BQ.store.get("bq-theme", "dark") === "light") theme();
-  showLobby();
+  render({ board: [], players: 0 }); lastData = null;   // 先畫空的；空畫面不算成績資料，沒連上前按 A 要跳提示
+  poll(); setInterval(poll, 3000);
 })();
 </script>
 </body>
