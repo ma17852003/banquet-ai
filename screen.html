@@ -46,7 +46,7 @@
   .row .tot { font-family: var(--font-mono); font-weight: 800; font-size: clamp(32px, 2.6vw, 52px); color: var(--gold-text); min-width: 3ch; text-align: right; font-variant-numeric: tabular-nums; }
   .row .stripe { position: absolute; left: 0; top: 14%; bottom: 14%; width: 6px; border-radius: 3px; }
   .row .up { position: absolute; left: 1vw; top: -.6vw; font-family: var(--font-mono); font-size: clamp(12px, .9vw, 18px); font-weight: 700;
-             color: var(--c-navy-900); background: var(--c-ivory); border-radius: var(--r-pill); padding: 2px 10px; animation: upfade 2.6s forwards; }
+             color: var(--bg); background: var(--text);   /* 跟著燈亮模式反色 */ border-radius: var(--r-pill); padding: 2px 10px; animation: upfade 2.6s forwards; }
   @keyframes upfade { 0%,75% { opacity: 1; } 100% { opacity: 0; } }
   .empty { color: var(--c-muted); font-size: clamp(28px, 1.6vw, 32px); padding: 2vw 0; }
 
@@ -174,12 +174,12 @@
     lastData = data; renderTeams();
     const board = data.board.filter(b => b.total > 0).slice(0, 10);
     const cnt = `共 ${data.players} 人`; if ($("#cnt").textContent !== cnt) $("#cnt").textContent = cnt;
-    const json = JSON.stringify(board);
+    const json = JSON.stringify(board) + (board.length ? "" : "|" + (data.players > 0));   // 還沒人得分時，「入座／出菜」提示要跟著人數換
     if (json === lastJSON) return;
     lastJSON = json;
     const lb = $("#lb");
     rows.forEach((el, k) => { if (!board.some(b => String(b.player) === k)) { el.remove(); rows.delete(k); } });   // 掉出前 10 名的拿掉
-    if (!board.length) { lb.innerHTML = `<li class="empty">${data.players ? "等大家出第一道菜…" : "等大家入座…"}</li>`; rows.clear(); lastRank = {}; lastTotal = {}; return; }
+    if (!board.length) { lb.innerHTML = `<li class="empty">${data.players > 0 ? "等大家出第一道菜…" : "等大家入座…"}</li>`; rows.clear(); lastRank = {}; lastTotal = {}; return; }
     const empty = lb.querySelector(".empty"); if (empty) empty.remove();
     const before = new Map(); rows.forEach((el, k) => before.set(k, el.getBoundingClientRect().top));
     let gained = false, overtook = false;
