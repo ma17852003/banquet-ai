@@ -162,6 +162,8 @@
       : me && me.total > 0 ? `<b>${S.player} 號</b>｜${me.total} 分｜第 ${me.rank} 名（共 ${b.players} 人）`
       : me ? `<b>${S.player} 號</b>｜還沒出餐（共 ${b.players} 人）`
       : `<b>${S.player} 號</b>｜${totalScore()} 分`;
+    const myTeam = me && BQ.rankTeams(b.board).find(x => x.team === Number(S.team));   // 分組對抗：組員平均分
+    if (myTeam) el.innerHTML += `<br>${esc(BQ.teamLabel(S.team))}：分組第 ${myTeam.rank} 名（平均 ${myTeam.avg} 分）`;
     const sync1 = $(".sync.bad"); if (sync1 && Object.values(R).every(r => r.synced)) sync1.remove();
   }
   async function newClass() {
@@ -404,7 +406,7 @@
   async function sync(n) {
     const r = R[n];
     if (!(await ensurePlayer())) { r.synced = false; saveRes(); return false; }   // 沒號碼的分數不送，拿到號碼再補
-    r.synced = await BQ.submitScore({ session: S.session, team: S.team, player: S.player, resetId: S.resetId, course: n, score: r.score, detail: r.detail });
+    r.synced = await BQ.submitScore({ session: S.session, team: S.team, player: S.player, resetId: S.resetId, course: n, score: r.score, tf: r.tf, detail: r.detail });   // tf＝剩餘時間比例，頒獎同分時比速度
     saveRes();
     return r.synced;
   }

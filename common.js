@@ -33,7 +33,7 @@
   }
   // 分數要帶個人編號和這一輪的 resetId；後端只算這一輪的分數
   async function submitScore(p) {
-    return !!(await post("/banquet-score", { session: p.session, team: String(p.team), level: String(p.course), score: String(p.score),
+    return !!(await post("/banquet-score", { session: p.session, team: String(p.team), level: String(p.course), score: String(p.score), tf: String(p.tf || 0),
                                              player: String(p.player), resetId: String(p.resetId), detail: JSON.stringify(p.detail || {}) }));
   }
   // 這支手機的固定識別碼：取號回應掉了重送，或換桌重新入座，都拿回同一個號碼
@@ -52,7 +52,7 @@
   async function resetSession(session) {
     return post("/banquet-reset", { session, confirm: "yes" }, 15000);
   }
-  // 排行榜：回 { board:[{player,team,total,levels,cleared,rank}], players, resetId }，失敗回 null
+  // 排行榜：回 { board:[{player,team,total,levels,tfs,cleared,rank}], players, resetId }，失敗回 null（tfs＝每道作答速度）
   async function fetchBoard(session) {
     try {
       const ctrl = new AbortController(); const tid = setTimeout(() => ctrl.abort(), 6000);
@@ -122,12 +122,12 @@
   // 個人排行：只算這一輪（Epoch＝resetId）的分數，同人同道取最高再加總；同分同名次
   function rankPlayers(scores, players) {
     const resetId = lastReset(players), joins = joinsSince(players);
-    const board = joins.map((r, i) => ({ player: i + 1, team: Number(r.Team), levels: {}, total: 0, cleared: 0 }));
+    const board = joins.map((r, i) => ({ player: i + 1, team: Number(r.Team), levels: {}, tfs: {}, total: 0, cleared: 0 }));
     scores.forEach(s => {
       const b = board[Number(s.Player) - 1];
       if (!b || Number(s.Epoch) !== resetId) return;
-      const lv = String(s.Level);
-      b.levels[lv] = Math.max(b.levels[lv] || 0, Number(s.Score) || 0);
+      const lv = String(s.Level), sc = Number(s.Score) || 0, tf = Number(s.Tf) || 0;   // tf＝這道剩下的時間比例，越大越快
+      if (b.levels[lv] == null || sc > b.levels[lv] || (sc === b.levels[lv] && tf > b.tfs[lv])) { b.levels[lv] = sc; b.tfs[lv] = tf; }
     });
     board.forEach(b => { b.total = Object.values(b.levels).reduce((a, x) => a + x, 0); b.cleared = Object.keys(b.levels).length; });
     board.sort((a, b) => b.total - a.total || a.player - b.player);
@@ -135,6 +135,50 @@
     return { resetId, players: joins.length, board };
   }
 
+  // 分組對抗：同桌組員總分的平均（還沒得分的人算 0，人數不同也公平），同分同名次、同分照桌號排
+  function rankTeams(board) {
+    const t = {};
+    board.forEach(b => { const k = Number(b.team); (t[k] = t[k] || { team: k, sum: 0, members: 0 }); t[k].sum += Number(b.total) || 0; t[k].members++; });
+    const list = Object.values(t).map(x => ({ team: x.team, members: x.members, avg: Math.round(x.sum / x.members) }));
+    list.sort((a, b) => b.avg - a.avg || a.team - b.team);
+    list.forEach(x => { x.rank = 1 + list.filter(y => y.avg > x.avg).length; });
+    return list;
+  }
+
+  // 不按名次的獎項：依序頒發。個人獎比「相關道次分數合計 → 作答速度合計 → 號碼小」，得過個人獎的人跳過；
+  // 分組獎（至少 2 人、每人都玩過）比「組員總分最高和最低差距最小 → 平均高 → 桌號小」，可以跟個人獎重複。投影幕只秀名稱和提示，不秀條件
+  const AWARDS = [
+    { id: "eagle", name: "鷹眼審稿獎", icon: "eye", levels: [2, 4] },
+    { id: "budget", name: "精算大師獎", icon: "coins", levels: [3] },
+    { id: "seat", name: "排座外交官", icon: "armchair", levels: [5] },
+    { id: "complaint", name: "客訴救火隊", icon: "fire-extinguisher", levels: [6] },
+    { id: "comeback", name: "下半場逆轉獎", icon: "rocket-launch", levels: [5, 6] },
+    { id: "steady", name: "最穩出菜獎", icon: "cooking-pot", levels: [1, 2, 3, 4, 5, 6], min: 70 },
+    { id: "team", name: "同桌同心獎", icon: "users-three", team: true }
+  ];
+  function pickAwards(board) {
+    const won = new Set();
+    return AWARDS.map(a => {
+      const base = { id: a.id, name: a.name, icon: a.icon, kind: a.team ? "team" : "player",
+                     hint: a.team ? "看的是：全桌一起進步" : "看的是：正確率＋作答速度" };
+      if (a.team) {
+        const t = {};
+        board.forEach(b => { (t[b.team] = t[b.team] || []).push(Number(b.total) || 0); });
+        const c = Object.keys(t).filter(k => t[k].length >= 2 && t[k].every(x => x > 0)).map(k => {   // 每位組員都要至少玩過 1 道
+          const v = t[k]; return { team: Number(k), members: v.length, spread: Math.max(...v) - Math.min(...v), avg: Math.round(v.reduce((x, y) => x + y, 0) / v.length) };
+        }).sort((x, y) => x.spread - y.spread || y.avg - x.avg || x.team - y.team);
+        return Object.assign(base, { winner: c[0] || null });
+      }
+      const c = board.filter(b => !won.has(b.player) && a.levels.every(lv => b.levels[lv] != null && b.levels[lv] >= (a.min || 0)))
+        .map(b => ({ player: b.player, team: b.team,
+                     score: a.levels.reduce((x, lv) => x + b.levels[lv], 0),
+                     speed: Math.round(a.levels.reduce((x, lv) => x + ((b.tfs || {})[lv] || 0), 0) * 100) / 100 }))   // 四捨五入，避免小數誤差決定得主
+        .sort((x, y) => y.score - x.score || y.speed - x.speed || x.player - y.player);
+      if (c[0]) won.add(c[0].player);
+      return Object.assign(base, { winner: c[0] || null });
+    });
+  }
+
   window.BQ = { shapeSVG, team, teamLabel, submitScore, fetchBoard, joinPlayer, resetSession, store, esc, courseScore, costAcc, comboStep, normSession, studentURL,
-                lastReset, playerNo, rankPlayers };
+                lastReset, playerNo, rankPlayers, rankTeams, pickAwards };
 })();

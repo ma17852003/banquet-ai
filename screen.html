@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@700;900&family=JetBrains+Mono:wght@500;700;800&display=swap">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/regular/style.css">
-<link rel="stylesheet" href="theme.css?v=15">
+<link rel="stylesheet" href="theme.css?v=18">
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
 <style>
   body { overflow: hidden; }
@@ -64,6 +64,31 @@
   @keyframes upfade { 0%,75% { opacity: 1; } 100% { opacity: 0; } }
   .empty { color: var(--c-muted); font-size: clamp(20px, 1.6vw, 32px); padding: 2vw 0; }
 
+  /* 頒獎畫面：獎名＋提示 → 揭曉得主（不顯示得獎條件）*/
+  .awards { position: fixed; inset: 0; z-index: 85; display: grid; place-items: center; background: var(--bg); color: var(--text); }   /* 跟著燈亮模式換色 */
+  .awards .box { text-align: center; padding: 3vw; max-width: 80vw; }
+  .awards .step { font-family: var(--font-mono); letter-spacing: .12em; color: var(--c-muted); font-size: clamp(28px, 1.6vw, 32px); }
+  .awards .ic { font-size: clamp(64px, 6vw, 120px); color: var(--text-dim); margin-top: 1.5vw; }   /* 金色只給分數和答對 */
+  .awards .aname { font-family: var(--font-serif); font-weight: 900; font-size: clamp(56px, 5.6vw, 110px); line-height: 1.15; margin-top: .6vw; }
+  .awards .hint { font-size: clamp(28px, 2vw, 40px); color: var(--text-dim); margin-top: 1vw; }
+  .awards .who { margin-top: 2.4vw; min-height: clamp(90px, 8vw, 160px); display: flex; align-items: center; justify-content: center; gap: 1.2vw;
+                 font-size: clamp(64px, 6.4vw, 128px); font-weight: 800; font-family: var(--font-mono); }
+  .awards .who small { font-family: var(--font-sans); font-size: clamp(30px, 2.6vw, 52px); font-weight: 700; color: var(--text-dim); display: inline-flex; align-items: center; gap: .6vw; }
+  .awards .who .shape { width: clamp(36px, 3vw, 60px); height: clamp(36px, 3vw, 60px); }
+  .awards .who.none { font-family: var(--font-sans); font-size: clamp(40px, 3.6vw, 72px); color: var(--c-muted); }
+  .awards .tap { margin-top: 2vw; font-size: clamp(16px, 1.1vw, 22px); color: var(--c-muted); }
+
+  /* 左側：分組對抗（組員平均分）*/
+  .teams { list-style: none; display: grid; gap: .45vw; margin-top: 1vw; }
+  .trow { display: grid; grid-template-columns: 2.6vw 1fr auto; align-items: center; gap: 1vw; padding: .5vw 1vw;
+          border-radius: var(--r-panel); background: var(--panel); position: relative; line-height: 1.1; }
+  .trow .rk { font-family: var(--font-mono); font-weight: 800; font-size: clamp(28px, 2vw, 40px); color: var(--c-muted); }
+  .trow .nm { display: flex; align-items: center; gap: .7vw; font-size: clamp(28px, 2vw, 40px); font-weight: 700; min-width: 0; }
+  .trow .nm .shape { width: clamp(22px, 1.8vw, 36px); height: clamp(22px, 1.8vw, 36px); }
+  .trow .nm small { font-size: clamp(16px, 1.1vw, 22px); font-weight: 500; color: var(--text-dim); }
+  .trow .avg { font-family: var(--font-mono); font-weight: 800; font-size: clamp(30px, 2.6vw, 52px); color: var(--gold-text); font-variant-numeric: tabular-nums; }
+  .trow .stripe { position: absolute; left: 0; top: 14%; bottom: 14%; width: 6px; border-radius: 3px; }
+
   /* 收單 */
   .closing { position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; background: rgba(10,20,38,.92);
              font-family: var(--font-serif); font-weight: 900; font-size: clamp(80px, 10vw, 200px); color: var(--c-ivory); }
@@ -92,7 +117,7 @@
 </div>
 
 <div class="ctrl" id="ctrl">
-  <button id="bQR"><i class="ph ph-qr-code"></i>入場 QR（0）</button>
+  <button id="bQR"><i class="ph ph-qr-code"></i>QR／分組（0）</button>
   <span id="courseBtns" style="display:contents"></span>
   <button id="bPlus"><i class="ph ph-plus"></i>30 秒（+）</button>
   <button id="bPause"><i class="ph ph-pause"></i>暫停（空白鍵）</button>
@@ -100,9 +125,11 @@
   <span class="conn" id="conn"><i class="ph ph-check"></i>連線中</span>
   <button id="bTheme" aria-pressed="false"><i class="ph ph-sun"></i>燈亮模式（L）</button>
   <button id="bSound" aria-pressed="false"><i class="ph ph-speaker-slash"></i>音效（M）</button>
+  <button id="bAward"><i class="ph ph-trophy"></i>頒獎（A）</button>
   <button id="bHide">隱藏控制列（H）</button>
   <button id="bReset" class="danger"><i class="ph ph-arrow-counter-clockwise"></i>新的一堂課</button>
 </div>
+<div class="awards" id="awards" hidden role="dialog" aria-modal="true" aria-label="頒獎"><div class="box" id="awBox"></div></div>
 <div class="confirm" id="confirm" hidden role="dialog" aria-modal="true" aria-labelledby="cfTitle"><div class="box">
   <h3 id="cfTitle"></h3>
   <p>學生的成績和編號都會清掉（下一位入座重新從 1 號開始），清掉就救不回來。</p>
@@ -110,8 +137,8 @@
   <div class="acts"><button id="cfNo">取消</button><button class="go" id="cfYes">確定清掉</button></div>
 </div></div>
 
-<script src="game-data.js?v=15"></script>
-<script src="common.js?v=15"></script>
+<script src="game-data.js?v=18"></script>
+<script src="common.js?v=18"></script>
 <script>
 (function () {
   const $ = s => document.querySelector(s);
@@ -127,10 +154,11 @@
   const META = "場次 " + session + " · James Wu｜AI 造王者";
   $("#meta").textContent = META;
 
-  // ── 左側：待機 QR／關卡倒數 ──
+  // ── 左側：待機 QR／分組對抗／關卡倒數 ──
   let cd = null; // { course, end, total, paused, remain }
+  let leftMode = "qr", lastData = null, lastTeamsJSON = "";
   function showLobby() {
-    cd = null;
+    cd = null; leftMode = "qr";
     const qr = qrcode(0, "M"); qr.addData(studentURL); qr.make();
     const svg = qr.createSvgTag(6, 0).replace(/ width="\d+px"/, "").replace(/ height="\d+px"/, "");
     $("#left").innerHTML = `<div class="k">掃碼入座</div>
@@ -138,8 +166,31 @@
       <div class="code" aria-label="場次碼 ${session.split("").join(" ")}">${session}</div>
       <div class="steps">手機掃 QR → 選你們的桌 → 記住你的號碼</div>`;
   }
+  // 分組對抗：同桌組員平均分（common.js 的 BQ.rankTeams，有測試）
+  function showTeams() {
+    cd = null; leftMode = "teams"; lastTeamsJSON = "";
+    renderTeams();
+  }
+  function renderTeams() {
+    if (leftMode !== "teams") return;
+    const list = lastData ? BQ.rankTeams(lastData.board) : [];
+    const json = JSON.stringify(list);
+    if (json === lastTeamsJSON && $("#teams")) return;   // 沒變就不動畫面
+    lastTeamsJSON = json;
+    $("#left").innerHTML = `<div class="k">分組對抗 · 組員平均分</div>
+      <ol class="teams" id="teams" aria-label="分組排名">${list.length ? list.map(x => {
+        const t = BQ.team(x.team); if (!t) return "";
+        return `<li class="trow" aria-label="第 ${x.rank} 名，${BQ.teamLabel(x.team)}，${x.members} 人，平均 ${x.avg} 分">
+          <span class="stripe" style="background:${t.color}"></span><span class="rk">${x.rank}</span>
+          <span class="nm">${BQ.shapeSVG(t)}<span>${t.name}</span><small>${x.members} 人</small></span><span class="avg">${x.avg}</span></li>`;
+      }).join("") : `<li class="empty">等大家入座…</li>`}</ol>`;
+  }
+  // 倒數還沒結束時按 0 不動作，免得誤按（0 跟 1 相鄰）把倒數弄掉
+  const toggleLeft = () => { if (leftMode === "countdown" && cd && !cd.closed) return; leftMode === "qr" ? showTeams() : showLobby(); };
   function startCourse(no) {
     const c = GAME.courses.find(x => x.no === no);
+    leftMode = "countdown";
+    $("#bPause").innerHTML = `<i class="ph ph-pause"></i>暫停（空白鍵）`;
     cd = { course: c, total: c.seconds, end: Date.now() + c.seconds * 1000, paused: false, remain: c.seconds * 1000, closed: false };
     $("#left").innerHTML = `<div class="k">COURSE ${pad(c.no)} · ${c.dish}</div>
       <div class="ctitle">${c.title}</div>
@@ -164,6 +215,7 @@
     tone(220, .5, "triangle");
     const el = document.createElement("div"); el.className = "closing"; el.textContent = "收單";
     document.body.appendChild(el); setTimeout(() => el.remove(), 1400);
+    setTimeout(() => { if (leftMode === "countdown" && cd && cd.closed) showTeams(); }, 5000);   // 收單 5 秒後回到分組對抗
   }
 
   // ── 右側：排行榜（資料沒變就不動畫面；有變才用 FLIP 換位置）──
@@ -172,6 +224,7 @@
     return GAME.courses.map(c => c.kind === "soon" ? `<span class="soon"></span>` : `<span class="${levels[c.no] != null ? "on" : ""}"></span>`).join("");
   }
   function render(data) {
+    lastData = data; renderTeams();
     const board = data.board.filter(b => b.total > 0).slice(0, 10);
     $("#cnt").textContent = `共 ${data.players} 人`;
     const json = JSON.stringify(board);
@@ -242,8 +295,38 @@
     $("#cfYes").disabled = true; $("#cfMsg").textContent = "清除中…";
     const r = await BQ.resetSession(session);
     if (!r) { $("#cfMsg").textContent = "不確定有沒有清掉（連不到計分伺服器）。檢查 n8n 和 tunnel 後再按一次，重按沒關係。"; $("#cfYes").disabled = false; return; }
-    cf.hidden = true; lastJSON = ""; showLobby(); render({ board: [], players: 0 }); poll();   // 先清空畫面，不等下一次輪詢
+    cf.hidden = true; lastJSON = ""; awList = [];   // 頒獎名單也清掉，免得新班按 A 秀出上一班的得主
+    showLobby(); render({ board: [], players: 0 }); poll();   // 先清空畫面，不等下一次輪詢
   };
+
+  // ── 頒獎：打開那一刻把名單算定（common.js 的 BQ.pickAwards，有測試）；每個獎按兩下：先猜、再揭曉 ──
+  const aw = $("#awards"); let awList = [], awIdx = 0, awShown = false;
+  function drawAward() {
+    const a = awList[awIdx], w = a.winner;
+    let who = "";
+    if (awShown) {
+      if (!w) who = `<div class="who none">從缺</div>`;
+      else if (a.kind === "team") { const t = BQ.team(w.team); who = `<div class="who">${t ? BQ.shapeSVG(t) : ""}<span>${BQ.esc(BQ.teamLabel(w.team))}</span></div>`; }
+      else { const t = BQ.team(w.team); who = `<div class="who">${w.player} 號<small>${t ? BQ.shapeSVG(t) : ""}${BQ.esc(BQ.teamLabel(w.team))}</small></div>`; }
+    } else who = `<div class="who none">？</div>`;
+    $("#awBox").innerHTML = `<div class="step">頒獎 · 第 ${awIdx + 1} / ${awList.length} 個獎</div>
+      <div class="ic"><i class="ph ph-${a.icon}" aria-hidden="true"></i></div>
+      <div class="aname">${a.name}</div><div class="hint">${a.hint}</div>${who}
+      <div class="tap">${awShown ? (awIdx + 1 < awList.length ? "按 A 看下一個獎" : "按 A 結束頒獎") : "先讓大家猜，按 A 揭曉"}</div>`;
+    if (awShown && w) tone(1320, .6);
+  }
+  function awardStep() {
+    if (aw.hidden) {
+      if (awList.length) { aw.hidden = false; drawAward(); return; }   // Esc 關掉後再按 A：從剛剛那個獎接著
+      if (!lastData) { $("#conn").className = "conn bad"; $("#conn").innerHTML = `<i class="ph ph-x"></i>還沒有成績資料，等右下角顯示「連線中」再按 A`; return; }
+      awList = BQ.pickAwards(lastData.board); awIdx = 0; awShown = false; aw.hidden = false; drawAward(); return;
+    }
+    if (!awShown) { awShown = true; drawAward(); return; }
+    if (awIdx + 1 < awList.length) { awIdx++; awShown = false; drawAward(); return; }
+    aw.hidden = true; awList = [];   // 全部頒完：下次按 A 重新算名單
+  }
+  $("#bAward").onclick = awardStep;
+  aw.onclick = awardStep;
 
   // ── 老師控制 ──
   PLAY.forEach(c => {
@@ -272,13 +355,15 @@
     if (soundOn) tone(1320, .4);
   };
   const hide = () => $("#ctrl").classList.toggle("hidden");
-  $("#bQR").onclick = showLobby; $("#bPlus").onclick = plus; $("#bPause").onclick = pause;
+  $("#bQR").onclick = toggleLeft; $("#bPlus").onclick = plus; $("#bPause").onclick = pause;
   $("#bTheme").onclick = theme; $("#bSound").onclick = sound; $("#bHide").onclick = hide;
   document.addEventListener("keydown", e => {
     if (e.target.tagName === "INPUT") return;
     const k = e.key.toLowerCase();
     if (!cf.hidden) { if (k === "escape") closeCf(); return; }   // 確認框開著時，其他快捷鍵都不動
-    if (k === "0") showLobby();
+    if (!aw.hidden) { if (k === "escape") aw.hidden = true; else if (["a", " ", "enter", "arrowright", "pagedown"].includes(k)) { e.preventDefault(); awardStep(); } return; }   // pagedown＝簡報筆
+    if (k === "a") { awardStep(); return; }
+    if (k === "0") toggleLeft();
     else if (PLAY.some(c => String(c.no) === k)) startCourse(Number(k));
     else if (k === "+" || k === "=") plus();
     else if (k === " ") { e.preventDefault(); pause(); }
