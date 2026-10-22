@@ -45,7 +45,7 @@
   }
   // 入座取號：回 { player, resetId }，失敗回 null
   async function joinPlayer(session, team) {
-    const j = await post("/banquet-join", { session, team: String(team), cid: deviceId() });
+    const j = await post("/banquet-join", { session, team: String(team), cid: deviceId() }, 20000);   // 全班同時掃碼時 NocoDB 偶爾卡十幾秒，多等一下少跳「網路不太穩」
     return j && j.player >= 1 ? { player: j.player, resetId: j.resetId } : null;
   }
   // 新的一堂課：清掉這個場次的成績、編號。回 { resetId }，失敗回 null
@@ -96,7 +96,8 @@
     return Number(s) > 0 ? String(Number(s)) : "";
   }
   // 題目檔是快取的舊版時 GAME.site 會是 undefined，QR 就壞了；所以這裡留一份保險
-  const studentURL = session => (GAME.site || "https://ma17852003.github.io/banquet-ai/") + "index.html?s=" + session;
+  // openExternalBrowser=1：用 LINE 掃碼時改用手機預設瀏覽器開，學生不會中途換瀏覽器又拿到第二個號碼
+  const studentURL = session => (GAME.site || "https://ma17852003.github.io/banquet-ai/") + "index.html?s=" + session + "&openExternalBrowser=1";
 
   // ── 個人編號（純函式，有測試；n8n 計分流程嵌入同一份）──
   // Players 表每次入座寫一列 join、每次「新的一堂課」寫一列 reset（reset 列永遠不刪，所以 resetId 只增不減）。

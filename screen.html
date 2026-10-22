@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@700;900&family=JetBrains+Mono:wght@500;700;800&display=swap">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/regular/style.css">
-<link rel="stylesheet" href="theme.css?v=19">
+<link rel="stylesheet" href="theme.css?v=20">
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
 <style>
   body { overflow: hidden; }
@@ -131,8 +131,8 @@
   <div class="acts"><button id="cfNo">取消</button><button class="go" id="cfYes">確定清掉</button></div>
 </div></div>
 
-<script src="game-data.js?v=19"></script>
-<script src="common.js?v=19"></script>
+<script src="game-data.js?v=20"></script>
+<script src="common.js?v=20"></script>
 <script>
 (function () {
   const $ = s => document.querySelector(s);
@@ -145,7 +145,8 @@
   const studentURL = BQ.studentURL(session);   // QR 一律連正式網址，從本機檔案打開投影幕也一樣
 
   // ── 右欄：QR＋場次碼，整堂課一直在 ──
-  const qr = qrcode(0, "M"); qr.addData(studentURL); qr.make();
+  // 低容錯：網址多了 LINE 參數，場次碼 1～3 位數時維持 33 格，後排比較好掃（投影畫面不會有污損）
+  const qr = qrcode(0, "L"); qr.addData(studentURL); qr.make();
   $("#qr").innerHTML = qr.createSvgTag(6, 0).replace(/ width="\d+px"/, "").replace(/ height="\d+px"/, "");
   $("#code").innerHTML = `<small>場次碼</small>${session}`;
   $("#code").setAttribute("aria-label", "場次碼 " + session.split("").join(" "));
