@@ -385,7 +385,7 @@
         <div class="bottom"><div class="mono" style="font-size:12px;letter-spacing:.12em;color:var(--c-ink-muted)">STAFF ID · AI-${pad(n)}</div>
         <div class="role">AI ${c.staff}</div><p style="margin-top:6px">${c.mission}</p></div></div>
       <div class="rules">
-        <div><i class="ph ph-hourglass-medium"></i><span>限時 ${Math.round(c.seconds / 60)} 分鐘。答得越對、出餐越快，分數越高</span></div>
+        <div><i class="ph ph-hourglass-medium"></i><span>限時 ${Math.round(c.seconds / 60)} 分鐘。全對就是 100 分；同分時比誰出餐快</span></div>
         <div><i class="ph ph-check"></i><span>${RULE[c.kind] || RULE.default}</span></div></div>`;
     setBar(`<button class="btn-ghost" id="back">菜單</button><button class="btn-serve" id="start" style="flex:1"><i class="ph ph-play"></i>開始</button>`);
     $("#back").onclick = renderMenu;
@@ -396,7 +396,7 @@
   // ── 結算：公式在 common.js 的 BQ.courseScore（有測試）──
   async function finish(n, acc, detail, extra, bonus) {
     const tf = timeFrac(); stopTimer();
-    const score = BQ.courseScore(acc, tf, bonus);
+    const score = BQ.courseScore(acc, bonus);
     R[n] = Object.assign({ score, acc, tf: Math.round(tf * 100) / 100, synced: false, detail }, extra);
     saveRes();
     renderResult(n, true);
@@ -406,7 +406,7 @@
   async function sync(n) {
     const r = R[n];
     if (!(await ensurePlayer())) { r.synced = false; saveRes(); return false; }   // 沒號碼的分數不送，拿到號碼再補
-    r.synced = await BQ.submitScore({ session: S.session, team: S.team, player: S.player, resetId: S.resetId, course: n, score: r.score, tf: r.tf, detail: r.detail });   // tf＝剩餘時間比例，頒獎同分時比速度
+    r.synced = await BQ.submitScore({ session: S.session, team: S.team, player: S.player, resetId: S.resetId, course: n, score: r.score, tf: r.tf, detail: r.detail });   // tf＝剩餘時間比例，排行榜和頒獎同分時比速度
     saveRes();
     return r.synced;
   }

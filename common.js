@@ -71,9 +71,9 @@
   const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
   // ── 計分（純函式，tests/game.test.js 會測）──
-  // 答對率決定一切；剩餘時間只放大答對的部分（亂交卷拿不到時間分）；連擊加分含在 100 分上限內
-  function courseScore(acc, timeFrac, bonus) {
-    return Math.min(100, Math.round(acc * (70 + 30 * timeFrac)) + (bonus || 0));
+  // 全對＝100，分數只看答對率（James 2026-10-27）；速度不算分，只在排行榜和頒獎同分時比。連擊加分最多到 99：只有全對拿得到 100
+  function courseScore(acc, bonus) {
+    return acc >= 1 ? 100 : Math.min(99, Math.round(acc * 100) + (bonus || 0));
   }
   // 第 3 道：踩一個陷阱的代價＝漏選兩張，全選不能拿分
   function costAcc(selected, cards) {
@@ -131,7 +131,8 @@
       if (b.levels[lv] == null || sc > b.levels[lv] || (sc === b.levels[lv] && tf > b.tfs[lv])) { b.levels[lv] = sc; b.tfs[lv] = tf; }
     });
     board.forEach(b => { b.total = Object.values(b.levels).reduce((a, x) => a + x, 0); b.cleared = Object.keys(b.levels).length; });
-    board.sort((a, b) => b.total - a.total || a.player - b.player);
+    const speed = p => Math.round(Object.values(p.tfs).reduce((a, x) => a + x, 0) * 100) / 100;   // 同分比出餐速度：加總全部玩過的道（頒獎只加該獎的道），四捨五入方式同頒獎
+    board.sort((a, b) => b.total - a.total || speed(b) - speed(a) || a.player - b.player);
     board.forEach(b => { b.rank = 1 + board.filter(x => x.total > b.total).length; });
     return { resetId, players: joins.length, board };
   }
