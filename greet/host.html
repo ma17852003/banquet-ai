@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>迎賓台｜主持人</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@700;900&family=JetBrains+Mono:wght@500;700;800&display=swap">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/regular/style.css">
+<link rel="stylesheet" href="../theme.css?v=21">
+<style>
+  /* 主持人頁：台上平板最小 24px、投影（1920 寬）最小 32px；金色只代表 VIP */
+  :focus-visible { outline-color: var(--text); }   /* 這個 app 的金色只代表 VIP，鍵盤聚焦框不用金色 */
+  body { overflow: hidden; background: var(--bg); display: flex; flex-direction: column; height: 100vh; }
+  :root { --min: clamp(24px, 1.67vw, 40px); }
+  .top { flex: none; height: 4.4vw; min-height: 56px; display: flex; align-items: center; gap: 1.6vw; padding: 0 2vw; border-bottom: 1px solid var(--line);
+         font-family: var(--font-mono); font-size: var(--min); color: var(--text-dim); font-variant-numeric: tabular-nums; }
+  .top b { color: var(--text); font-weight: 700; }
+  .top .brand { font-family: var(--font-serif); font-weight: 900; color: var(--text); margin-right: auto; }
+  .conn { font-family: var(--font-sans); font-size: var(--min); display: inline-flex; align-items: center; gap: .4vw; }
+  .conn.bad { color: var(--wrong); }
+  .vipbar { display: flex; align-items: center; gap: 1vw; padding: .5vw 2vw; background: var(--c-gold-soft); color: var(--text); font-size: var(--min); font-weight: 700; }
+  .vipbar i { color: var(--gold-text); }
+  .stage { flex: 1; min-height: 0; display: grid; grid-template-columns: 60fr 40fr; gap: 2vw; padding: 2vw; }
+
+  /* 左：下一位（桌上對折名牌）*/
+  .next { --pad: 2vw; position: relative; display: flex; flex-direction: column; padding: 1.4vw var(--pad); border-radius: var(--r-panel);
+          background: var(--panel); border: 2px solid transparent; min-width: 0; overflow: hidden; }
+  .next > * { flex-shrink: 0; }   /* 空間緊時不准把介紹那行壓成 0 高 */
+  .next.vip { border-color: var(--c-gold); }
+  [data-theme="light"] .next.vip { border-color: var(--c-gold-ink); }
+  /* 「下一位」那行底下的虛線＝桌上對折名牌的折線 */
+  .next .kick { font-family: var(--font-mono); font-size: var(--min); letter-spacing: .12em; color: var(--text-dim); margin: 0 calc(-1 * var(--pad)) 1vw; padding: 0 var(--pad) .8vw; border-bottom: 1px dashed var(--line); }
+  .next .vtag { position: absolute; top: 1.4vw; right: var(--pad); font-family: var(--font-mono); font-weight: 800; font-size: var(--min); color: var(--gold-text); display: inline-flex; gap: .4vw; align-items: center; }
+  .next .say1 { font-size: var(--min); font-weight: 500; color: var(--text-dim); }
+  .next .ttl { font-size: clamp(28px, 2.4vw, 56px); font-weight: 500; margin-top: .6vw; }
+  .next .nm { font-family: var(--font-serif); font-weight: 700; font-size: clamp(44px, 4.6vw, 110px); line-height: 1.15; margin-top: .3vw; overflow-wrap: anywhere; }
+  .next .en { font-size: clamp(28px, 2.2vw, 52px); font-weight: 500; color: var(--text-dim); margin-top: .3vw; }
+  .next .intro { font-size: clamp(24px, 1.9vw, 44px); font-weight: 500; margin-top: 1.2vw; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .next .pron { font-family: var(--font-mono); font-size: clamp(24px, 1.9vw, 44px); font-weight: 700; margin-top: 1vw; }
+  .next .pron.unsure { text-decoration: underline dashed var(--text-dim); text-underline-offset: .3em; }
+  .unsure-tag { display: inline-flex; align-items: center; gap: .4vw; margin-top: .6vw; font-size: var(--min); color: var(--text-dim); border: 1px solid var(--text-dim); border-radius: var(--r-pill); padding: .2vw .9vw; width: fit-content; }
+  .acts { display: flex; gap: 1.2vw; margin-top: auto; padding-top: 1vw; }   /* 按鈕固定在名牌底部 */
+  .acts button { min-height: max(64px, 4.6vw); padding: 0 2vw; border-radius: 12px; font-size: var(--min); font-weight: 700; display: inline-flex; align-items: center; gap: .6vw;
+                 border: 2px solid var(--line); background: transparent; color: var(--text); }
+  .acts .done { background: var(--text); color: var(--bg); border-color: var(--text); flex: 1; justify-content: center; }
+  .empty { font-size: clamp(32px, 2.6vw, 60px); color: var(--text-dim); margin: auto 0; }
+  .preempt { margin-top: 1vw; padding: .6vw 1vw; border-radius: 12px; border: 2px dashed var(--text-dim); font-size: var(--min); display: flex; gap: 1vw; align-items: center; flex-wrap: wrap; }
+  .preempt button { min-height: 44px; padding: 0 1.2vw; border-radius: 10px; border: 2px solid var(--text); background: transparent; color: var(--text); font-size: var(--min); font-weight: 700; }
+
+  /* 右：主賓未到、接下來、已唸 */
+  .side { display: flex; flex-direction: column; gap: 1.4vw; min-width: 0; overflow: hidden; }
+  .sec h3 { font-family: var(--font-mono); font-size: var(--min); letter-spacing: .1em; color: var(--text-dim); font-weight: 700; margin-bottom: .6vw; }
+  .pend li { list-style: none; font-size: var(--min); display: flex; gap: .6vw; align-items: baseline; padding: .2vw 0; }
+  .pend .t { color: var(--text-dim); }
+  .queue { list-style: none; display: grid; gap: .6vw; overflow: hidden; }
+  .qcard { position: relative; padding: .7vw 1vw .7vw 1.4vw; border-radius: 10px; background: var(--panel); border: 2px solid transparent; will-change: transform; }
+  .qcard.vip { border-color: var(--c-gold); }
+  [data-theme="light"] .qcard.vip { border-color: var(--c-gold-ink); }
+  .qcard::before { content: ""; position: absolute; left: 0; top: 18%; bottom: 18%; width: 4px; border-radius: 2px; background: var(--text); }
+  .qcard .n { font-family: var(--font-serif); font-weight: 700; font-size: clamp(28px, 2vw, 48px); line-height: 1.2; }
+  .qcard .m { font-size: var(--min); color: var(--text-dim); display: flex; gap: .8vw; flex-wrap: wrap; }
+  .qcard .vt { color: var(--gold-text); font-family: var(--font-mono); font-weight: 800; }
+  .qcard.enter { animation: slidein var(--t-reveal) var(--ease-out); }
+  @keyframes slidein { from { opacity: 0; transform: translateX(-12px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) { .qcard.enter { animation: none; } }
+  details.donebox summary { font-family: var(--font-mono); font-size: var(--min); color: var(--text-dim); cursor: pointer; }
+  details.donebox li { list-style: none; font-size: var(--min); color: var(--text-dim); display: flex; gap: .8vw; align-items: center; padding: .2vw 0; }
+  details.donebox button { border: 1px solid var(--line); background: transparent; color: var(--text-dim); border-radius: 8px; font-size: var(--min); padding: 4px 12px; }
+  .more { font-size: var(--min); color: var(--text-dim); }
+</style>
+</head>
+<body>
+<div class="top">
+  <span class="brand">迎賓台</span>
+  <span>已到 <b id="cA">0</b></span><span>已唸 <b id="cR">0</b></span><span>待唸 <b id="cW">0</b></span>
+  <span class="conn" id="conn"><i class="ph ph-check"></i>連線中</span>
+</div>
+<div class="vipbar" id="vipbar" hidden></div>
+<div class="stage">
+  <section class="next" id="next" aria-live="polite"></section>
+  <aside class="side">
+    <div class="sec"><h3>主賓未到</h3><ul class="pend" id="pend"></ul></div>
+    <div class="sec" style="min-height:0;flex:1;display:flex;flex-direction:column"><h3>接下來</h3><ol class="queue" id="queue"></ol><p class="more" id="more"></p></div>
+    <details class="donebox sec" id="donebox"><summary id="doneSum">已唸 0 位</summary><ul id="doneList"></ul></details>
+  </aside>
+</div>
+<script src="greet-core.js?v=1"></script>
+<script>
+(function () {
+  const $ = s => document.querySelector(s), esc = GR.esc;
+  const qs = new URLSearchParams(location.search);
+  const event = GR.normEvent(qs.get("e")) || "demo";
+  const pinKey = "gr-pin-" + event, store = { get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* 無痕模式 */ } } };
+  let state = null, pinned = store.get(pinKey) || "", lastKey = "", seen = new Set(), firstPaint = true, hiddenRead = new Set();
+
+  function speak(g) {
+    if (!("speechSynthesis" in window)) return;
+    const u = new SpeechSynthesisUtterance(g.en || g.zh);
+    u.lang = g.en ? "en-US" : "zh-TW"; u.rate = .85;
+    speechSynthesis.cancel(); speechSynthesis.speak(u);
+  }
+
+  // 剛按「已唸」、伺服器還沒確認的人，畫面上先當作唸過（畫面和鍵盤共用這一份）
+  const viewNow = () => GR.hostView({ guests: state.guests, st: Object.fromEntries(Object.entries(state.st).map(([k, v]) => [k, hiddenRead.has(k) ? Object.assign({}, v, { state: "read" }) : v])) }, pinned);
+  function render() {
+    if (!state) return;
+    const view = viewNow();
+    const show = g => g && [g.gid, g.zh, g.en, g.say, g.ok, g.title, g.org, g.intro, g.vip, g.at];   // 臨開場改唸法、頭銜後重存名單，畫面要跟著變
+    const key = JSON.stringify([show(view.next), show(view.preempt), view.queue.map(show), view.pendingVip.map(show), view.done.map(show), !!state.truncated]);
+    $("#cA").textContent = view.counts.arrived; $("#cR").textContent = view.counts.read; $("#cW").textContent = view.counts.waiting;
+    if (key === lastKey) return;   // 畫面要顯示的東西沒變：不動 DOM（不閃爍、不跳頂）
+    lastKey = key;
+    if (view.next && view.next.gid !== pinned) { pinned = view.next.gid; store.set(pinKey, pinned); }
+
+    // 左：下一位
+    const g = view.next, nx = $("#next");
+    nx.classList.toggle("vip", !!(g && g.vip));
+    nx.innerHTML = !g ? `<div class="kick">下一位</div><p class="empty">等來賓到場…<br><span style="font-size:var(--min)">櫃台按「到了」，這裡就會跳出來</span></p>` : `
+      <div class="kick">下一位 · 到 ${esc(GR.hhmm(g.at))}</div>${g.vip ? `<div class="vtag"><i class="ph ph-star"></i>VIP</div>` : ""}
+      <div class="say1">讓我們歡迎</div>
+      ${g.title ? `<div class="ttl">${esc(g.title)}${g.org ? ` · ${esc(g.org)}` : ""}</div>` : ""}
+      <div class="nm">${esc(g.zh || g.en)}</div>${g.zh && g.en ? `<div class="en">${esc(g.en)}</div>` : ""}
+      ${g.intro ? `<div class="intro">${esc(g.intro)}</div>` : ""}
+      ${g.say ? `<div class="pron ${g.ok ? "" : "unsure"}">唸法 ${esc(g.say)}</div>` : ""}
+      ${g.ok ? "" : `<div class="unsure-tag"><i class="ph ph-question"></i>唸法未確認：先唸頭銜＋姓</div>`}
+      ${view.preempt ? `<div class="preempt"><span>順序在前：<b>${esc(view.preempt.zh || view.preempt.en)}</b></span><button id="swap">先唸他</button></div>` : ""}
+      <div class="acts"><button id="say"><i class="ph ph-speaker-high"></i>發音（S）</button><button class="done" id="readBtn"><i class="ph ph-check"></i>已唸（空白鍵）</button></div>`;
+    if (g) {
+      $("#say").onclick = () => speak(g);
+      $("#readBtn").onclick = () => markRead(g);
+      if (view.preempt) $("#swap").onclick = () => { pinned = view.preempt.gid; store.set(pinKey, pinned); lastKey = ""; render(); };
+    }
+
+    // 右：主賓未到、接下來（只動有變的卡，FLIP 讓位）
+    $("#pend").innerHTML = !view.pendingVip.length ? `<li class="t">主賓都到了</li>`   // 最多列 4 位，不把「接下來」擠出畫面
+      : view.pendingVip.slice(0, 4).map(p => `<li><i class="ph ph-circle"></i><span>${esc(p.zh || p.en)}</span><span class="t">${esc(p.title)}</span></li>`).join("")
+        + (view.pendingVip.length > 4 ? `<li class="t">還有 ${view.pendingVip.length - 4} 位</li>` : "");
+    const ol = $("#queue"), shown = view.queue.slice(0, 5), before = new Map();
+    ol.querySelectorAll(".qcard").forEach(el => before.set(el.dataset.g, el.getBoundingClientRect().top));
+    const els = shown.map(q => {
+      let el = [...ol.querySelectorAll(".qcard")].find(x => x.dataset.g === q.gid);
+      const html = `<div class="n">${esc(q.zh || q.en)}</div><div class="m">${q.vip ? `<span class="vt">★ VIP</span>` : ""}<span>${esc(q.title)}</span><span>到 ${esc(GR.hhmm(q.at))}</span></div>`;
+      if (!el) { el = document.createElement("li"); el.className = "qcard"; el.dataset.g = q.gid; if (!firstPaint && !seen.has(q.gid)) el.classList.add("enter"); }
+      if (el.innerHTML !== html) el.innerHTML = html;
+      el.classList.toggle("vip", !!q.vip);
+      seen.add(q.gid); return el;
+    });
+    ol.querySelectorAll(".qcard").forEach(el => { if (!els.includes(el)) el.remove(); });
+    els.forEach(el => ol.appendChild(el));
+    if (!matchMedia("(prefers-reduced-motion: reduce)").matches) els.forEach(el => {
+      const old = before.get(el.dataset.g); if (old == null) return;
+      const dy = old - el.getBoundingClientRect().top;
+      if (dy) el.animate([{ transform: `translateY(${dy}px)` }, { transform: "none" }], { duration: 600, easing: "cubic-bezier(0.16,1,0.3,1)" });
+    });
+    $("#more").textContent = view.queue.length > 5 ? `還有 ${view.queue.length - 5} 位` : (view.queue.length ? "" : "目前沒有其他人");
+    $("#doneSum").textContent = `已唸 ${view.done.length} 位`;
+    $("#doneList").innerHTML = view.done.map(d => `<li><i class="ph ph-check"></i>${esc(d.zh || d.en)}<button data-un="${esc(d.gid)}">念錯了，放回去</button></li>`).join("");
+    $("#doneList").querySelectorAll("button").forEach(b => b.onclick = () => act("unread", b.dataset.un));
+    if (g && !seen.has("vipbar:" + g.gid) && g.vip && !firstPaint) {   // VIP 剛成為下一位：上方提示一次
+      seen.add("vipbar:" + g.gid); $("#vipbar").innerHTML = `<i class="ph ph-star"></i>VIP 到場：${esc(g.title)} ${esc(g.zh || g.en)}`; $("#vipbar").hidden = false;
+    } else if (!g || !g.vip) $("#vipbar").hidden = true;
+    firstPaint = false;
+  }
+
+  const offline = () => conn(false, `網路斷了：${GR.queued()} 個動作恢復後自動補送`);
+  async function act(kind, gid) {
+    if (!(await GR.actOrQueue(event, kind, gid))) { offline(); return; }   // 已唸的人照樣收起來，等補送
+    poll(true);
+  }
+  function markRead(g) { hiddenRead.add(g.gid); pinned = ""; lastKey = ""; render(); act("read", g.gid); }   // 先在畫面上收起來，不等伺服器
+
+  function conn(okk, msg) {
+    const c = $("#conn"); c.className = "conn" + (okk ? "" : " bad");
+    c.innerHTML = okk ? `<i class="ph ph-check"></i>連線中` : `<i class="ph ph-x"></i>${esc(msg || "連不到伺服器")}`;
+  }
+  let polling = false;
+  async function poll(force) {
+    if (polling) return; polling = true;
+    try {
+      if (GR.queued() && !(await GR.flush())) { offline(); return; }   // 先補送斷線時沒送出去的動作
+      const r = await GR.fetchState(event, force || !state ? 0 : state.version);
+      if (!r) { conn(false); return; }
+      if (r.truncated) conn(false, "動作超過 1000 筆，最早到場的紀錄可能不準，請找技術人員"); else conn(true);   // same 回應也帶 truncated，警告不會被蓋掉
+      if (r.same) return;
+      state = r;
+      hiddenRead.forEach(gid => { const s = r.st[gid]; if (!s || s.state !== "arrived") hiddenRead.delete(gid); });   // 伺服器已確認唸過
+      render();
+    } finally { polling = false; }
+  }
+  poll(); setInterval(poll, 2000);
+
+  let lastRead = 0;
+  document.addEventListener("keydown", e => {
+    const k = e.key.toLowerCase(), g = state && viewNow().next;
+    if ([" ", "pagedown", "arrowright"].includes(k)) {
+      e.preventDefault();
+      if (e.repeat || Date.now() - lastRead < 700 || !g) return;   // 長按或簡報筆連發只算一下，不會一次跳過好幾位
+      lastRead = Date.now(); markRead(g);
+    }   // 簡報筆的「下一頁」＝已唸
+    else if (k === "s" && g) speak(g);
+    else if (k === "l") { const light = document.documentElement.dataset.theme !== "light"; document.documentElement.dataset.theme = light ? "light" : "dark"; store.set("gr-theme", light ? "light" : "dark"); }
+  });
+  if (store.get("gr-theme") === "light") document.documentElement.dataset.theme = "light";
+})();
+</script>
+</body>
+</html>

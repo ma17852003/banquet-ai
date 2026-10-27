@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>迎賓台｜櫃台</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@700;900&family=JetBrains+Mono:wght@500;700;800&display=swap">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/regular/style.css">
+<link rel="stylesheet" href="../theme.css?v=21">
+<style>
+  /* 櫃台頁：手機單手操作，「到了」在拇指好按的右邊；金色只代表 VIP，按鈕不用金色 */
+  :focus-visible { outline-color: var(--text); }   /* 這個 app 的金色只代表 VIP，鍵盤聚焦框不用金色 */
+  body { background: var(--bg); padding-bottom: 96px; }
+  .bar { position: sticky; top: 0; z-index: 5; background: var(--bg); padding: 12px 16px 10px; border-bottom: 1px solid var(--line); }
+  .head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; }
+  .head b { font-family: var(--font-serif); font-size: 20px; }
+  .head .ev { font-family: var(--font-mono); font-size: 14px; color: var(--text-dim); }
+  .conn { margin-left: auto; font-size: 14px; color: var(--text-dim); display: inline-flex; gap: 4px; align-items: center; }
+  .conn.bad { color: var(--wrong); }
+  #q { width: 100%; min-height: 48px; font-size: 17px; padding: 0 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel); color: var(--text); }
+  .tabs { display: flex; gap: 8px; margin-top: 10px; }
+  .tabs button { flex: 1; min-height: 40px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--text-dim); font-size: 15px; font-weight: 500; }
+  .tabs button[aria-pressed="true"] { background: var(--text); color: var(--bg); border-color: var(--text); font-weight: 700; }
+  .tabs .num { font-family: var(--font-mono); margin-left: 4px; }
+  ul.list { list-style: none; padding: 8px 16px; display: grid; gap: 8px; }
+  .row { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center; padding: 10px 12px; border-radius: 12px; background: var(--panel); border: 2px solid transparent; }
+  .row.vip { border-color: var(--c-gold); }
+  [data-theme="light"] .row.vip { border-color: var(--c-gold-ink); }
+  .row .n { font-size: 18px; font-weight: 700; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+  .row .n small { font-size: 14px; font-weight: 500; color: var(--text-dim); }
+  .row .m { font-size: 14px; color: var(--text-dim); margin-top: 2px; }
+  .row .vt { color: var(--gold-text); font-family: var(--font-mono); font-weight: 800; font-size: 13px; }
+  .row .st { font-family: var(--font-mono); font-size: 13px; color: var(--text-dim); margin-top: 2px; }
+  .row.left .n, .row.left .m { color: var(--c-muted); }
+  .go { min-height: 56px; min-width: 88px; border-radius: 12px; border: 0; background: var(--text); color: var(--bg); font-size: 17px; font-weight: 700; }
+  .go:disabled { opacity: .6; }
+  .more { min-height: 48px; min-width: 48px; border-radius: 12px; border: 1px solid var(--line); background: transparent; color: var(--text); font-size: 20px; }
+  .menu { grid-column: 1 / -1; display: flex; gap: 8px; }
+  .menu button { flex: 1; min-height: 44px; border-radius: 10px; border: 1px solid var(--line); background: transparent; color: var(--text); font-size: 15px; }
+  .empty { padding: 24px 16px; color: var(--text-dim); font-size: 16px; }
+  .toast { position: fixed; left: 16px; right: 16px; bottom: 16px; z-index: 9; display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 12px;
+           background: var(--text); color: var(--bg); font-size: 16px; box-shadow: 0 6px 24px rgba(0,0,0,.35); }
+  .toast button { margin-left: auto; min-height: 44px; padding: 0 14px; border-radius: 10px; border: 2px solid var(--bg); background: transparent; color: var(--bg); font-size: 16px; font-weight: 700; }
+  .toast.bad { background: var(--wrong); color: #fff; }
+</style>
+</head>
+<body>
+<div class="bar">
+  <div class="head"><b>迎賓台 · 櫃台</b><span class="ev" id="ev"></span><span class="conn" id="conn"><i class="ph ph-check"></i>連線中</span></div>
+  <input id="q" type="search" placeholder="搜尋名字、英文名、單位" autocomplete="off" aria-label="搜尋來賓">
+  <div class="tabs" role="group" aria-label="篩選">
+    <button data-f="waiting" aria-pressed="true">未到<span class="num" id="nW">0</span></button>
+    <button data-f="arrived" aria-pressed="false">已到<span class="num" id="nA">0</span></button>
+    <button data-f="left" aria-pressed="false">已離開<span class="num" id="nL">0</span></button>
+  </div>
+</div>
+<ul class="list" id="list" aria-live="polite"></ul>
+<div class="toast" id="toast" hidden></div>
+<script src="greet-core.js?v=1"></script>
+<script>
+(function () {
+  const $ = s => document.querySelector(s), esc = GR.esc;
+  const event = GR.normEvent(new URLSearchParams(location.search).get("e")) || "demo";
+  $("#ev").textContent = "活動 " + event;
+  let state = null, filter = "waiting", open = "", busy = new Set(), lastKey = "", toastTimer = 0;
+  const STATE_OF = s => s === "read" ? "arrived" : s;   // 已唸也算已到
+
+  function render() {
+    if (!state) { $("#list").innerHTML = `<li class="empty">讀取名單中…</li>`; return; }
+    const all = state.guests.map(g => Object.assign({}, g, state.st[g.gid] || { state: "waiting" }));
+    const n = f => all.filter(g => STATE_OF(g.state) === f).length;
+    $("#nW").textContent = n("waiting"); $("#nA").textContent = n("arrived"); $("#nL").textContent = n("left");
+    const q = $("#q").value, hits = GR.search(all, q).filter(g => q.trim() || STATE_OF(g.state) === filter);   // 有打字就搜全部
+    const key = JSON.stringify([state.version, q, filter, open, [...busy]]);
+    if (key === lastKey) return;
+    lastKey = key;
+    if (!state.guests.length) { $("#list").innerHTML = `<li class="empty">這個活動還沒有名單。請先到準備頁貼上名單。</li>`; return; }
+    $("#list").innerHTML = hits.length ? hits.sort((a, b) => a.order - b.order).map(g => {
+      const s = STATE_OF(g.state), stTxt = g.state === "read" ? `已唸 · 到 ${GR.hhmm(g.at)}` : s === "arrived" ? `到 ${GR.hhmm(g.at)}` : s === "left" ? "已離開" : "";
+      return `<li class="row ${g.vip ? "vip" : ""} ${s === "left" ? "left" : ""}">
+        <div><div class="n">${esc(g.zh || g.en)}${g.zh && g.en ? `<small>${esc(g.en)}</small>` : ""}${g.vip ? `<span class="vt">★ VIP</span>` : ""}</div>
+          <div class="m">${esc([g.title, g.org].filter(Boolean).join(" · "))}</div>${stTxt ? `<div class="st">${esc(stTxt)}</div>` : ""}</div>
+        ${s === "arrived" ? `<button class="more" data-more="${esc(g.gid)}" aria-label="更多動作">⋯</button>`
+          : `<button class="go" data-go="${esc(g.gid)}" ${busy.has(g.gid) ? "disabled" : ""}>${busy.has(g.gid) ? "送出中" : "到了"}</button>`}
+        ${open === g.gid ? `<div class="menu"><button data-k="unarrive" data-g="${esc(g.gid)}">改回未到</button><button data-k="leave" data-g="${esc(g.gid)}">已離開</button></div>` : ""}
+      </li>`;
+    }).join("") : `<li class="empty">${q.trim() ? "找不到這個人。換英文名或單位試試。" : "這一區沒有人。"}</li>`;
+    $("#list").querySelectorAll("[data-go]").forEach(b => b.onclick = () => arrive(b.dataset.go));
+    $("#list").querySelectorAll("[data-more]").forEach(b => b.onclick = () => { open = open === b.dataset.more ? "" : b.dataset.more; render(); });
+    $("#list").querySelectorAll(".menu button").forEach(b => b.onclick = () => { open = ""; send(b.dataset.k, b.dataset.g); });
+  }
+
+  function toast(html, bad, undo) {
+    clearTimeout(toastTimer);
+    const t = $("#toast"); t.className = "toast" + (bad ? " bad" : ""); t.innerHTML = html; t.hidden = false;
+    if (undo) t.querySelector("button").onclick = () => { t.hidden = true; send("unarrive", undo); };
+    toastTimer = setTimeout(() => { t.hidden = true; }, 8000);   // 按錯有 8 秒可以復原；之後從「⋯」改回
+  }
+  async function send(kind, gid) {
+    busy.add(gid); render();
+    const ok = await GR.actOrQueue(event, kind, gid);
+    busy.delete(gid);
+    if (!ok) { toast(`網路斷了：已記下，恢復後自動補送（共 ${GR.queued()} 筆）`, true); render(); return false; }
+    await poll(true);
+    return true;
+  }
+  async function arrive(gid) {
+    const g = state.guests.find(x => x.gid === gid);
+    if (await send("arrive", gid)) toast(`已標記 ${esc(g.zh || g.en)} 到場<button>復原</button>`, false, gid);
+  }
+
+  function conn(okk) { const c = $("#conn"); c.className = "conn" + (okk ? "" : " bad"); c.innerHTML = okk ? `<i class="ph ph-check"></i>連線中` : `<i class="ph ph-x"></i>連不到伺服器`; }
+  let polling = false;
+  async function poll(force) {
+    if (polling && !force) return; polling = true;
+    try {
+      if (GR.queued()) {   // 先補送斷線時沒送出去的動作
+        if (!(await GR.flush())) { conn(false); return; }
+        toast("網路恢復了，剛剛的動作已補送");
+      }
+      const r = await GR.fetchState(event, force || !state ? 0 : state.version);
+      if (!r) { conn(false); render(); return; }
+      conn(true);
+      if (!r.same && !(state && r.version < state.version)) { state = r; render(); }   // 晚回來的舊資料不蓋掉新的
+    } finally { polling = false; }
+  }
+  $("#q").oninput = render;
+  document.querySelectorAll(".tabs button").forEach(b => b.onclick = () => {
+    filter = b.dataset.f; document.querySelectorAll(".tabs button").forEach(x => x.setAttribute("aria-pressed", String(x === b))); render();
+  });
+  render(); poll(); setInterval(poll, 3000);
+})();
+</script>
+</body>
+</html>

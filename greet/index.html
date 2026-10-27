@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>迎賓台｜準備名單</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@700;900&family=JetBrains+Mono:wght@500;700;800&display=swap">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/regular/style.css">
+<link rel="stylesheet" href="../theme.css?v=21">
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+<style>
+  :focus-visible { outline-color: var(--text); }   /* 這個 app 的金色只代表 VIP，鍵盤聚焦框不用金色 */
+  body { background: var(--bg); }
+  .wrap { max-width: 1280px; margin: 0 auto; padding: 24px 16px 48px; }
+  h1 { font-family: var(--font-serif); font-size: 30px; }
+  .sub { color: var(--text-dim); margin-top: 4px; font-size: 16px; }
+  .evrow { display: flex; gap: 10px; align-items: center; margin-top: 16px; flex-wrap: wrap; font-size: 16px; }
+  .evrow input { width: 160px; min-height: 44px; font-family: var(--font-mono); font-size: 18px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel); color: var(--text); }
+  .cloud { font-family: var(--font-mono); font-size: 14px; color: var(--text-dim); }
+  textarea { width: 100%; min-height: 140px; margin-top: 16px; padding: 12px; border-radius: 12px; border: 1px dashed var(--text-dim); background: var(--panel); color: var(--text);
+             font-family: var(--font-mono); font-size: 14px; line-height: 1.5; }
+  .btns { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+  .btns button { min-height: 48px; padding: 0 18px; border-radius: 12px; border: 1px solid var(--line); background: transparent; color: var(--text); font-size: 16px; display: inline-flex; gap: 6px; align-items: center; }
+  .btns .main { background: var(--text); color: var(--bg); border-color: var(--text); font-weight: 700; }
+  .btns .main:disabled { opacity: .45; }
+  .btns .danger { margin-left: auto; border-color: var(--wrong); color: var(--wrong); }
+  .check { margin-top: 14px; font-size: 15px; display: grid; gap: 4px; }
+  .check .e { color: var(--wrong); }
+  .check .w { color: var(--text-dim); }
+  .check .ok { color: var(--text); }
+  .grid { display: grid; grid-template-columns: 65fr 35fr; gap: 20px; margin-top: 18px; align-items: start; }
+  @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+  th { font-family: var(--font-mono); font-size: 12px; letter-spacing: .08em; color: var(--text-dim); font-weight: 700; }
+  td.num { font-family: var(--font-mono); }
+  tr { cursor: pointer; } tr[aria-selected="true"] td { background: var(--panel); }
+  .vt { color: var(--gold-text); font-family: var(--font-mono); font-weight: 800; }
+  .card { position: sticky; top: 16px; padding: 22px; border-radius: var(--r-panel); background: var(--panel); border: 2px solid transparent; }
+  .card.vip { border-color: var(--c-gold); }
+  [data-theme="light"] .card.vip { border-color: var(--c-gold-ink); }
+  .card .k { font-family: var(--font-mono); font-size: 12px; letter-spacing: .12em; color: var(--text-dim); }
+  .card .ttl { font-size: 18px; font-weight: 500; margin-top: 12px; }
+  .card .nm { font-family: var(--font-serif); font-weight: 700; font-size: 34px; line-height: 1.2; }
+  .card .en { color: var(--text-dim); font-size: 16px; }
+  .card .intro { margin-top: 8px; font-size: 16px; }
+  .card .pron { font-family: var(--font-mono); margin-top: 8px; font-weight: 700; }
+  .card .pron.unsure { text-decoration: underline dashed var(--text-dim); text-underline-offset: .3em; }
+  .qrs { display: flex; gap: 24px; flex-wrap: wrap; margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--line); }
+  .qr { text-align: center; font-size: 15px; }
+  .qr .box { width: 160px; padding: 10px; background: var(--c-ivory); border-radius: 10px; margin-bottom: 8px; }
+  .qr .box svg { display: block; width: 100%; height: auto; }
+  .qr a { color: var(--text); }
+  .confirm { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; background: rgba(10,20,38,.85); }
+  .confirm .box2 { background: var(--panel); border: 2px solid var(--wrong); border-radius: 14px; padding: 22px; max-width: 460px; font-size: 16px; }
+  .confirm .acts { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; }
+  .confirm button { min-height: 46px; padding: 0 16px; border-radius: 10px; border: 1px solid var(--line); background: transparent; color: var(--text); font-size: 16px; }
+  .confirm .go { background: var(--wrong); border-color: var(--wrong); color: #fff; font-weight: 700; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>迎賓台 · 準備名單</h1>
+  <p class="sub">把賓客名單從 Excel、Google 試算表或 ChatGPT 的表格直接貼進來。櫃台按「到了」，主持人畫面就會跳出這位來賓的唸稿。</p>
+  <div class="evrow"><label for="ev">活動碼</label><input id="ev" maxlength="12" autocomplete="off"><span class="cloud" id="cloud">讀取中…</span></div>
+  <textarea id="paste" placeholder="第一列是表頭：中文名、英文名、唸法、頭銜、單位、國家、禮賓順序、VIP、唸法已確認、介紹（缺幾欄也可以，至少要有中文名或英文名）"></textarea>
+  <div class="btns">
+    <button id="demo"><i class="ph ph-file-text"></i>放入示範名單</button>
+    <button class="main" id="save" disabled><i class="ph ph-cloud-arrow-up"></i>存到雲端</button>
+    <button class="danger" id="reset"><i class="ph ph-arrow-counter-clockwise"></i>新的一場（清空到場紀錄）</button>
+  </div>
+  <div class="check" id="check" aria-live="polite"></div>
+  <div class="grid">
+    <div><table><thead><tr><th>順序</th><th>中文名</th><th>英文名</th><th>頭銜</th><th>單位</th><th>唸法</th><th>VIP</th></tr></thead><tbody id="rows"></tbody></table></div>
+    <div class="card" id="card"><p class="k">唸稿預覽</p><p class="sub">點左邊任一列，看主持人畫面上的樣子。</p></div>
+  </div>
+  <div class="qrs" id="qrs"></div>
+</div>
+<div class="confirm" id="cf" hidden role="dialog" aria-modal="true"><div class="box2">
+  <b>確定開始新的一場？</b><p style="margin-top:8px;color:var(--text-dim)">所有「到了」「已唸」的紀錄都會清掉，名單保留。</p><p id="cfMsg"></p>
+  <div class="acts"><button id="cfNo">取消</button><button class="go" id="cfYes">清空到場紀錄</button></div>
+</div></div>
+<script src="greet-core.js?v=1"></script>
+<script>
+(function () {
+  const $ = s => document.querySelector(s), esc = GR.esc;
+  const qs = new URLSearchParams(location.search);
+  let event = GR.normEvent(qs.get("e")) || "demo", parsed = { guests: [], errors: [], warnings: [] }, sel = "";
+  $("#ev").value = event;
+
+  function qrs() {   // 掃了直接開櫃台頁／主持人頁（同一個活動碼）
+    const base = location.href.replace(/[^/]*(\?.*)?$/, "");
+    $("#qrs").innerHTML = [["desk.html", "櫃台（手機）"], ["host.html", "主持人（平板／投影）"]].map(([p, label]) => {
+      const url = `${base}${p}?e=${event}`, q = qrcode(0, "M"); q.addData(url); q.make();
+      return `<div class="qr"><div class="box">${q.createSvgTag(4, 0).replace(/ width="\d+px"/, "").replace(/ height="\d+px"/, "")}</div><a href="${esc(url)}" target="_blank" rel="noopener">${label}</a></div>`;
+    }).join("");
+  }
+  async function cloud() {
+    const s = await GR.fetchState(event);
+    if (!s) { $("#cloud").textContent = "連不到伺服器"; return; }
+    const st = Object.values(s.st);
+    $("#cloud").textContent = s.guests.length ? `雲端名單 ${s.guests.length} 位 · 已到 ${st.filter(x => x.state !== "waiting" && x.state !== "left").length} 位` : "雲端還沒有名單";
+    if (!$("#paste").value.trim() && s.guests.length) { parsed = { guests: s.guests, errors: [], warnings: [] }; draw(true); }   // 沒貼東西時先顯示雲端那份
+  }
+  function draw(fromCloud) {
+    const c = [];
+    parsed.errors.forEach(e => c.push(`<div class="e"><i class="ph ph-x-circle"></i> 第 ${e.row} 列：${esc(e.msg)}</div>`));
+    parsed.warnings.forEach(w => c.push(`<div class="w"><i class="ph ph-question"></i> 第 ${w.row} 列：${esc(w.msg)}</div>`));
+    if (!fromCloud && parsed.guests.length && !parsed.errors.length) c.unshift(`<div class="ok"><i class="ph ph-check-circle"></i> ${parsed.guests.length} 位來賓，可以存到雲端</div>`);
+    $("#check").innerHTML = c.join("");
+    $("#save").disabled = fromCloud || !parsed.guests.length || parsed.errors.length > 0;
+    $("#rows").innerHTML = parsed.guests.slice().sort((a, b) => a.order - b.order).map(g =>
+      `<tr data-g="${esc(g.gid)}" aria-selected="${g.gid === sel}"><td class="num">${g.order}</td><td>${esc(g.zh)}</td><td>${esc(g.en)}</td><td>${esc(g.title)}</td><td>${esc(g.org)}</td><td>${esc(g.say)}${g.say && !g.ok ? " ?" : ""}</td><td>${g.vip ? `<span class="vt">★</span>` : ""}</td></tr>`).join("");
+    $("#rows").querySelectorAll("tr").forEach(tr => tr.onclick = () => { sel = tr.dataset.g; draw(fromCloud); });
+    const g = parsed.guests.find(x => x.gid === sel);
+    $("#card").classList.toggle("vip", !!(g && g.vip));
+    if (g) $("#card").innerHTML = `<p class="k">唸稿預覽 ${g.vip ? `<span class="vt">★ VIP</span>` : ""}</p><p class="sub">讓我們歡迎</p>
+      <p class="ttl">${esc(g.title)}${g.org ? ` · ${esc(g.org)}` : ""}</p><p class="nm">${esc(g.zh || g.en)}</p>${g.zh && g.en ? `<p class="en">${esc(g.en)}</p>` : ""}
+      ${g.intro ? `<p class="intro">${esc(g.intro)}</p>` : ""}${g.say ? `<p class="pron ${g.ok ? "" : "unsure"}">唸法 ${esc(g.say)}</p>` : ""}${g.ok ? "" : `<p class="sub">? 唸法未確認：先唸頭銜＋姓</p>`}`;
+  }
+  $("#paste").oninput = () => { parsed = GR.parseList($("#paste").value); sel = ""; draw(); };
+  $("#demo").onclick = () => { $("#paste").value = GR.DEMO; $("#paste").oninput(); };
+  $("#save").onclick = async () => {
+    $("#save").disabled = true; $("#check").insertAdjacentHTML("afterbegin", `<div class="w">存檔中…</div>`);
+    const ok = await GR.saveList(event, parsed.guests);
+    $("#check").firstElementChild.remove();
+    $("#check").insertAdjacentHTML("afterbegin", ok ? `<div class="ok"><i class="ph ph-check-circle"></i> 已存到雲端（活動碼 ${esc(event)}）。到場紀錄還在，同名的人代號不變。</div>`
+                                                   : `<div class="e"><i class="ph ph-x-circle"></i> 沒存成功（連不到伺服器），再按一次</div>`);
+    $("#save").disabled = !!ok; cloud();
+  };
+  $("#ev").onchange = () => { const v = GR.normEvent($("#ev").value); if (!v) { $("#ev").value = event; return; } event = v; $("#ev").value = v; history.replaceState(null, "", "?e=" + v); qrs(); cloud(); };
+  $("#reset").onclick = () => { $("#cfMsg").textContent = `活動碼：${event}`; $("#cf").hidden = false; $("#cfNo").focus(); };
+  $("#cfNo").onclick = () => { $("#cf").hidden = true; };
+  $("#cfYes").onclick = async () => {
+    $("#cfYes").disabled = true; $("#cfMsg").textContent = "清除中…";
+    const ok = await GR.resetEvent(event);
+    $("#cfYes").disabled = false;
+    if (!ok) { $("#cfMsg").textContent = "不確定有沒有清掉（連不到伺服器），再按一次沒關係"; return; }
+    $("#cf").hidden = true; cloud();
+  };
+  qrs(); cloud();
+})();
+</script>
+</body>
+</html>
