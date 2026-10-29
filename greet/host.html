@@ -87,6 +87,37 @@
     .next .intro { -webkit-line-clamp: 1; }
     .qcard { padding-top: .45vw; padding-bottom: .45vw; }
   }
+  /* 學生手機當主持人：上下排（現在請唸 → 大按鈕 → 接下來 → 已唸），整頁可以捲；投影版面不受影響 */
+  .swap { display: none; }
+  @media (max-width: 767px) {
+    :root { --min: 16px; }
+    body { overflow: auto; height: auto; min-height: 100vh; }
+    .top { height: auto; min-height: 0; flex-wrap: wrap; gap: 4px 14px; padding: 10px 16px; }
+    .top .brand { flex-basis: 100%; font-size: 20px; }
+    .swap { display: inline-flex; margin-left: auto; align-items: center; min-height: 36px; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--r-pill); color: var(--text); text-decoration: none; font-family: var(--font-sans); font-size: 15px; }
+    .stage { grid-template-columns: 1fr; gap: 20px; padding: 12px 16px 28px; }
+    .next { --pad: 18px; padding-top: 14px; }
+    .next .lead, .next .en, .next .pron { font-size: 18px; }
+    .next .who { font-size: 22px; margin-top: 4px; }
+    .next .nm { font-size: 44px; margin-top: 2px; }
+    .next .intro { font-size: 17px; margin-top: 10px; padding-top: 8px; }
+    .unsure-tag { font-size: 14px; padding: 2px 10px; }
+    .preempt { padding: 10px 12px; margin-top: 12px; }
+    .preempt button { min-height: 44px; padding: 0 14px; }
+    .acts { flex-direction: column-reverse; gap: 10px; padding-top: 16px; }   /* 「唸完了」排上面、最大 */
+    .acts button { min-height: 56px; padding: 0 16px; gap: 8px; justify-content: center; }
+    .acts .key { display: none; }   /* 手機沒有鍵盤 */
+    .side { overflow: visible; gap: 20px; }
+    .sec h3 { margin-bottom: 8px; }
+    .queue { gap: 8px; }
+    .qcard { padding: 10px 12px; column-gap: 10px; }
+    .qcard::before { width: 34px; height: 34px; }
+    .qcard .n { font-size: 22px; }
+    .qcard .m span + span { margin-left: 10px; }
+    .donesec { min-height: 0; }
+    .donelist { max-height: 40vh; }
+    .donelist button { min-height: 36px; }
+  }
 </style>
 </head>
 <body>
@@ -94,6 +125,7 @@
   <span class="brand">迎賓台</span>
   <span>已到 <b id="cA">0</b>／<span id="cT">0</span></span><span>已唸 <b id="cR">0</b></span><span>待唸 <b id="cW">0</b></span>
   <span class="conn" id="conn"><i class="ph ph-check"></i>連線中</span>
+  <a class="swap" id="roleSwap">換成簽到人員</a>
 </div>
 <div class="stage">
   <section class="next" id="next" aria-live="polite"></section>
@@ -103,14 +135,16 @@
     <div class="sec donesec"><h3>已唸 <small id="doneSum">0 位</small></h3><ul class="donelist" id="doneList"></ul></div>
   </aside>
 </div>
-<script src="greet-core.js?v=3"></script>
+<script src="greet-core.js?v=4"></script>
 <script>
 (function () {
   const $ = s => document.querySelector(s), esc = GR.esc;
   const qs = new URLSearchParams(location.search);
   const event = GR.normEvent(qs.get("e")) || "demo";
   const pinKey = "gr-pin-" + event, store = { get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* 無痕模式 */ } } };
-  let state = null, pinned = store.get(pinKey) || "", lastKey = "", doneKey = "", doneTop = "", seen = new Set(), firstPaint = true, hiddenRead = new Set();
+  let state = null, pinned = store.get(pinKey) || "", lastKey = "", doneKey = "", doneTop = "", seen = new Set(), firstPaint = true;
+  const hiddenRead = new Map(), queuedRead = new Set();   // 畫面先收起來的已唸：gid → 送到伺服器的時間（0＝還沒送到）；斷線排隊中的另外記，補送完才算送到
+  $("#roleSwap").href = "desk.html?e=" + encodeURIComponent(event);
 
   function speak(g) {
     if (!("speechSynthesis" in window)) return;
@@ -144,7 +178,7 @@
         ${g.say || !g.ok ? `<div class="pron">${g.say ? `<span>唸法 <b class="${g.ok ? "" : "unsure"}">${esc(g.say)}</b></span>` : ""}${g.ok ? "" : `<span class="unsure-tag"><i class="ph ph-question"></i>唸法未確認：先唸頭銜＋姓</span>`}</div>` : ""}
         ${view.preempt ? `<div class="preempt"><span>順序在前的 <b>${esc(view.preempt.zh || view.preempt.en)}</b> 到了</span><button id="swap">先唸他</button></div>` : ""}
       </div>
-      <div class="acts"><button id="say"><i class="ph ph-speaker-high"></i>發音（S）</button><button class="done" id="readBtn"><i class="ph ph-check"></i>唸完了，下一位（空白鍵）</button></div>`;
+      <div class="acts"><button id="say"><i class="ph ph-speaker-high"></i>發音<span class="key">（S）</span></button><button class="done" id="readBtn"><i class="ph ph-check"></i>唸完了，下一位<span class="key">（空白鍵）</span></button></div>`;
     if (g) {
       $("#say").onclick = () => speak(g);
       $("#readBtn").onclick = () => markRead(g);
@@ -188,32 +222,38 @@
 
   const offline = () => conn(false, `網路斷了：${GR.queued()} 個動作恢復後自動補送`);
   async function act(kind, gid) {
-    if (!(await GR.actOrQueue(event, kind, gid))) { offline(); return; }   // 已唸的人照樣收起來，等補送
+    if (!(await GR.actOrQueue(event, kind, gid))) { if (kind === "read") queuedRead.add(gid); offline(); return; }   // 已唸的人照樣收起來，等補送
+    if (kind === "read" && hiddenRead.has(gid)) hiddenRead.set(gid, Date.now());
     poll(true);
   }
-  function markRead(g) { hiddenRead.add(g.gid); pinned = ""; lastKey = ""; render(); act("read", g.gid); }   // 先在畫面上收起來，不等伺服器
+  function markRead(g) { hiddenRead.set(g.gid, 0); pinned = ""; lastKey = ""; render(); act("read", g.gid); }   // 先在畫面上收起來，不等伺服器
   // 已唸還沒確認就放回去：畫面先放回來（不然補送完伺服器是「已到」，這位會一直藏到重新整理）；放回去排在已唸後面送
-  function markUnread(gid) { if (hiddenRead.delete(gid)) { lastKey = ""; render(); } act("unread", gid); }
+  function markUnread(gid) { queuedRead.delete(gid); if (hiddenRead.delete(gid)) { lastKey = ""; render(); } act("unread", gid); }
 
   function conn(okk, msg) {
     const c = $("#conn"); c.className = "conn" + (okk ? "" : " bad");
     c.innerHTML = okk ? `<i class="ph ph-check"></i>連線中` : `<i class="ph ph-x"></i>${esc(msg || "連不到伺服器")}`;
   }
-  let polling = false;
+  let polling = false, fails = 0;
   async function poll(force) {
     if (polling) return; polling = true;
     try {
-      if (GR.queued() && !(await GR.flush())) { offline(); return; }   // 先補送斷線時沒送出去的動作
-      const r = await GR.fetchState(event, force || !state ? 0 : state.version);
-      if (!r) { conn(false); return; }
-      if (r.truncated) conn(false, "動作超過 1000 筆，最早到場的紀錄可能不準，請找技術人員"); else conn(true);   // same 回應也帶 truncated，警告不會被蓋掉
+      if (GR.queued()) {   // 先補送斷線時沒送出去的動作
+        if (!(await GR.flush())) { fails++; offline(); return; }
+        queuedRead.forEach(gid => { if (hiddenRead.has(gid)) hiddenRead.set(gid, Date.now()); }); queuedRead.clear();
+      }
+      const fetchedAt = Date.now(), r = await GR.fetchState(event, force || !state ? 0 : state.version);
+      if (!r) { if (++fails >= 2) conn(false); return; }   // 全班一起連，偶爾掉一次不嚇人；連續兩次才說連不到
+      fails = 0;
+      if (r.same ? state && state.truncated : r.truncated) conn(false, "動作超過 1000 筆，最早到場的紀錄可能不準，請找技術人員"); else conn(true);   // same 回應不帶 truncated，沿用上一次
       if (r.same) return;
       state = r;
-      hiddenRead.forEach(gid => { const s = r.st[gid]; if (!s || s.state !== "arrived") hiddenRead.delete(gid); });   // 伺服器已確認唸過
+      GR.pruneHidden(hiddenRead, r.st, fetchedAt);   // 伺服器已唸，或別的主持人按了放回去
       render();
     } finally { polling = false; }
   }
-  poll(); setInterval(poll, 2000);
+  const phone = matchMedia("(max-width: 767px)").matches;   // 學生手機 3 秒、投影 2 秒：全班一起開時 NocoDB 才撐得住（2026-10-29 壓測）
+  (async function loop() { try { await poll(); } finally { setTimeout(loop, GR.pollDelay(phone ? 3000 : 2000, fails, Math.random())); } })();   // 畫面出錯也不能停止輪詢
 
   let lastRead = 0;
   document.addEventListener("keydown", e => {

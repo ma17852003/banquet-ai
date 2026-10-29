@@ -98,6 +98,18 @@
     };
   }
 
+  // 主持人頁先收起來的「已唸」（gid → 送到伺服器的時間，0＝還沒送到）什麼時候放掉：
+  // 伺服器已唸、名單沒這個人、或送到之後才讀的狀態卻是已到（別人按了放回去）
+  function pruneHidden(hidden, st, fetchedAt) {
+    hidden.forEach((sentAt, gid) => {
+      const s = st[gid];
+      if (!s || s.state !== "arrived" || (sentAt && sentAt <= fetchedAt)) hidden.delete(gid);
+    });
+  }
+
+  // 下一次輪詢等多久：30 支手機同時開，每支隨機錯開 ±15% 免得一起撞進來；連續失敗就退開（2 倍、最多 4 倍）讓伺服器喘口氣
+  const pollDelay = (base, fails, rnd) => Math.round(base * Math.pow(2, Math.min(fails, 2)) * (0.85 + 0.3 * rnd));
+
   // 主持人照念的一句：「讓我們歡迎 {頭銜・單位} {名字}」，畫面把名字放最大
   function hostScript(g) {
     return { who: [g.title, g.org].filter(Boolean).join("・"), name: g.zh || g.en || "" };
@@ -127,7 +139,28 @@
     "陳怡君\tChen Yi-chun\t\t營養師\t\t台灣\t7\t否\t是\t今晚蔬食菜單的顧問",
     "張文華\tChang Wen-hua\t\t採購經理\t好市超市\t台灣\t8\t否\t是\t超市生鮮採購",
     "林小芸\tLin Hsiao-yun\t\t美食部落客\t\t台灣\t9\t否\t是\t專寫蔬食的美食部落客",
-    "林佳慧\tLin Chia-hui\t\t記者\t美食週刊\t台灣\t10\t否\t是\t美食週刊記者"
+    "林佳慧\tLin Chia-hui\t\t記者\t美食週刊\t台灣\t10\t否\t是\t美食週刊記者",
+    // 11～30：全班一起當櫃台時才按不完；前 10 位是示範腳本，不要動
+    "黃志明\tHuang Chih-ming\t\t總經理\t日日鮮蔬果\t台灣\t11\t否\t是\t供應今晚全部的有機蔬菜",
+    "吳淑芬\tWu Shu-fen\t\t主廚\t綠灶蔬食餐廳\t台灣\t12\t否\t是\t今晚甜點的客座主廚",
+    "鈴木美咲\tSuzuki Misaki\tsu-ZU-ki mi-SA-ki\t採購主任\t鈴木食品\t日本\t13\t否\t是\t日本超市的進口採購",
+    "\tDaniel Tan\tDAN-yel TAHN\t區域經理\tLion City Grocers\t新加坡\t14\t否\t是\t新加坡連鎖超市",
+    "李建宏\tLee Chien-hung\t\t理事長\t中區餐飲公會\t台灣\t15\t否\t是\t中部餐飲業的老前輩",
+    "周雅婷\tChou Ya-ting\t\t行銷經理\t好饗冷凍食品\t台灣\t16\t否\t是\t冷凍調理包的合作夥伴",
+    "\tNguyen Van An\tNWEN van AHN\t進口商\tSaigon Fresh\t越南\t17\t否\t是\t越南的經銷夥伴",
+    "許文彬\tHsu Wen-pin\t\t廠長\t山海醬油\t台灣\t18\t否\t是\t百年醬油老店第四代",
+    "郭怡安\tKuo Yi-an\t\t營運長\t早安連鎖早餐\t台灣\t19\t否\t是\t全台三百家早餐店",
+    "朴志恩\tPark Ji-eun\tPAHK jee-UN\t商品開發\t韓味食品\t韓國\t20\t否\t是\t韓國泡菜工廠",
+    "曾國峰\tTseng Kuo-feng\t\t董事長\t曾記烘焙\t台灣\t21\t否\t是\t新品麵包的代工廠",
+    "\tMaria Santos\tma-REE-ah SAHN-tos\t採購經理\tManila Food Hub\t菲律賓\t22\t否\t是\t菲律賓的食品通路",
+    "賴佩君\tLai Pei-chun\t\t店長\t好市超市\t台灣\t23\t否\t是\t旗艦店店長",
+    "蔡明哲\tTsai Ming-che\t\t物流經理\t冷鏈快遞\t台灣\t24\t否\t是\t負責今晚食材的冷鏈配送",
+    "\tSomchai Prasert\tSOM-chai pra-SERT\t代表\tBangkok Spice Co.\t泰國\t25\t否\t是\t泰國香料供應商",
+    "劉家豪\tLiu Chia-hao\t\t主編\t餐飲新聞網\t台灣\t26\t否\t是\t餐飲新聞網主編",
+    "江美玲\tChiang Mei-ling\t\t教授\t餐旅學院\t台灣\t27\t否\t是\t研究蔬食營養的老師",
+    "高振宇\tKao Chen-yu\t\t創辦人\t小農直送\t台灣\t28\t否\t是\t串起兩百位小農",
+    "邱詩涵\tChiu Shih-han\t\t網紅\t\t台灣\t29\t否\t是\t十萬追蹤的料理網紅",
+    "范書豪\tFan Shu-hao\t\t攝影師\t\t台灣\t30\t否\t是\t今晚的活動攝影"
   ].join("\n");
 
   // ── 後端：失敗一律回 null（呼叫端顯示連線狀態），表單格式＝瀏覽器不先送預檢請求 ──
@@ -177,5 +210,5 @@
   // 名單是人貼進來的：畫面上一律跳脫，免得名字裡的 < > 把頁面弄壞
   const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
-  window.GR = { parseList, foldState, hostView, hostScript, search, hhmm, normEvent, esc, DEMO, fetchState, act, actOrQueue, flush, queued, saveList, resetEvent };
+  window.GR = { parseList, foldState, hostView, hostScript, pruneHidden, pollDelay, search, hhmm, normEvent, esc, DEMO, fetchState, act, actOrQueue, flush, queued, saveList, resetEvent };
 })();
