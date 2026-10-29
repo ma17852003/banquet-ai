@@ -131,7 +131,7 @@
       if (b.levels[lv] == null || sc > b.levels[lv] || (sc === b.levels[lv] && tf > b.tfs[lv])) { b.levels[lv] = sc; b.tfs[lv] = tf; }
     });
     board.forEach(b => { b.total = Object.values(b.levels).reduce((a, x) => a + x, 0); b.cleared = Object.keys(b.levels).length; });
-    const speed = p => Math.round(Object.values(p.tfs).reduce((a, x) => a + x, 0) * 100) / 100;   // 同分比出餐速度：加總全部玩過的道（頒獎只加該獎的道），四捨五入方式同頒獎
+    const speed = p => Math.round(Object.values(p.tfs).reduce((a, x) => a + x, 0) * 100) / 100;   // n8n 用 toString() 嵌入這個函式，不能改成呼叫 speedOf；同分比出餐速度：加總全部玩過的道（頒獎只加該獎的道），四捨五入方式同頒獎
     board.sort((a, b) => b.total - a.total || speed(b) - speed(a) || a.player - b.player);
     board.forEach(b => { b.rank = 1 + board.filter(x => x.total > b.total).length; });
     return { resetId, players: joins.length, board };
@@ -148,7 +148,8 @@
   }
 
   // 不按名次的獎項：依序頒發。個人獎比「相關道次分數合計 → 作答速度合計 → 號碼小」，得過個人獎的人跳過；
-  // 分組獎（至少 2 人、每人都玩過）比「組員總分最高和最低差距最小 → 平均高 → 桌號小」，可以跟個人獎重複。投影幕只秀名稱和提示，不秀條件
+  // 符合門檻的人都得過獎時，改給還沒得獎、最接近門檻的人（先比達標道數），全班都得過獎或其他人都沒分數才從缺（James 2026-10-29）。
+  // 最後頒小組冠軍＝投影幕「分組對抗」第一名（組員平均分，同分比全桌平均速度），可以跟個人獎重複。投影幕只秀名稱和提示，不秀條件
   const AWARDS = [
     { id: "eagle", name: "鷹眼審稿獎", icon: "eye", levels: [2, 4] },
     { id: "budget", name: "精算大師獎", icon: "coins", levels: [3] },
@@ -156,26 +157,28 @@
     { id: "complaint", name: "客訴救火隊", icon: "fire-extinguisher", levels: [6] },
     { id: "comeback", name: "下半場逆轉獎", icon: "rocket-launch", levels: [5, 6] },
     { id: "steady", name: "最穩出菜獎", icon: "cooking-pot", levels: [1, 2, 3, 4, 5, 6], min: 70 },
-    { id: "team", name: "同桌同心獎", icon: "users-three", team: true }
+    { id: "team", name: "小組冠軍", icon: "trophy", team: true }
   ];
+  const speedOf = (b, lvs) => Math.round(lvs.reduce((x, lv) => x + ((b.tfs || {})[lv] || 0), 0) * 100) / 100;   // 四捨五入，避免小數誤差決定得主
   function pickAwards(board) {
     const won = new Set();
     return AWARDS.map(a => {
       const base = { id: a.id, name: a.name, icon: a.icon, kind: a.team ? "team" : "player",
-                     hint: a.team ? "看的是：全桌一起進步" : "看的是：正確率＋作答速度" };
+                     hint: a.team ? "看的是：全桌平均分最高" : "看的是：正確率＋作答速度" };
       if (a.team) {
         const t = {};
-        board.forEach(b => { (t[b.team] = t[b.team] || []).push(Number(b.total) || 0); });
-        const c = Object.keys(t).filter(k => t[k].length >= 2 && t[k].every(x => x > 0)).map(k => {   // 每位組員都要至少玩過 1 道
-          const v = t[k]; return { team: Number(k), members: v.length, spread: Math.max(...v) - Math.min(...v), avg: Math.round(v.reduce((x, y) => x + y, 0) / v.length) };
-        }).sort((x, y) => x.spread - y.spread || y.avg - x.avg || x.team - y.team);
+        // 平均算法必須跟 rankTeams 一樣，投影幕「分組對抗」第一名才會是冠軍
+        board.forEach(b => { const k = Number(b.team); (t[k] = t[k] || { team: k, sum: 0, spd: 0, members: 0 }); t[k].sum += Number(b.total) || 0; t[k].spd += speedOf(b, Object.keys(b.levels || {})); t[k].members++; });
+        const c = Object.values(t).map(x => ({ team: x.team, members: x.members, avg: Math.round(x.sum / x.members), speed: Math.round(x.spd / x.members * 100) / 100 }))
+          .filter(x => x.avg > 0 && team(x.team)).sort((x, y) => y.avg - x.avg || y.speed - x.speed || x.team - y.team);   // 不存在的桌號投影幕秀不出來，不能當冠軍
         return Object.assign(base, { winner: c[0] || null });
       }
-      const c = board.filter(b => !won.has(b.player) && a.levels.every(lv => b.levels[lv] != null && b.levels[lv] >= (a.min || 0)))
-        .map(b => ({ player: b.player, team: b.team,
-                     score: a.levels.reduce((x, lv) => x + b.levels[lv], 0),
-                     speed: Math.round(a.levels.reduce((x, lv) => x + ((b.tfs || {})[lv] || 0), 0) * 100) / 100 }))   // 四捨五入，避免小數誤差決定得主
-        .sort((x, y) => y.score - x.score || y.speed - x.speed || x.player - y.player);
+      const min = a.min || 0, lvOf = b => b.levels || {}, hit = b => a.levels.filter(lv => lvOf(b)[lv] != null && lvOf(b)[lv] >= min).length;
+      const left = board.filter(b => !won.has(b.player) && Number(b.total) > 0);   // 總分 0（只玩了 0 分的那道）不算候選
+      const strict = left.filter(b => hit(b) === a.levels.length);
+      const c = (strict.length ? strict : left)   // 沒人達標：還沒得獎、有分數的人裡找最接近的
+        .map(b => ({ player: b.player, team: b.team, hit: hit(b), score: a.levels.reduce((x, lv) => x + (lvOf(b)[lv] || 0), 0), speed: speedOf(b, a.levels) }))
+        .sort((x, y) => y.hit - x.hit || y.score - x.score || y.speed - x.speed || x.player - y.player);
       if (c[0]) won.add(c[0].player);
       return Object.assign(base, { winner: c[0] || null });
     });
