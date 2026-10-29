@@ -135,8 +135,8 @@
     try {
       const ctrl = new AbortController(), tid = setTimeout(() => ctrl.abort(), ms || 10000);
       const r = await fetch(API + path, { method: "POST", body: new URLSearchParams(fields), signal: ctrl.signal });
-      clearTimeout(tid);
       const j = await r.json().catch(() => null);
+      clearTimeout(tid);   // 內容讀完才停計時：標頭到了、內容卡住也會逾時，不然排在後面的動作全部跟著卡死
       return j && j.ok === true ? j : null;
     } catch (e) { return null; }
   }
@@ -145,18 +145,23 @@
     try {
       const ctrl = new AbortController(), tid = setTimeout(() => ctrl.abort(), 8000);
       const r = await fetch(API + "/greet-state?event=" + encodeURIComponent(event) + "&v=" + (version || 0), { signal: ctrl.signal, cache: "no-store" });
-      clearTimeout(tid);
       const j = await r.json();
+      clearTimeout(tid);   // 同上：內容卡住也要逾時，不然輪詢永遠停在半路
       return j && j.ok && (j.same || Array.isArray(j.guests)) ? j : null;
     } catch (e) { return null; }
   }
   const act = (event, kind, gid) => post("/greet-act", { event, kind, gid });
   // 送不出去的動作先排隊，讀得到伺服器時照原順序補送（同一個動作送兩次沒關係：重複的「到了」「已唸」只算一次）
   const outbox = [];
-  async function actOrQueue(event, kind, gid) {
-    if (!outbox.length && await act(event, kind, gid)) return true;
-    outbox.push({ event, kind, gid });   // 前面還有沒送出的就排在後面，維持順序
-    return false;
+  let tail = Promise.resolve();   // 上一個動作還在路上，下一個就等它：不然「放回去」可能比「已唸」先到，被伺服器當成沒事
+  function actOrQueue(event, kind, gid) {
+    const run = tail.then(async () => {
+      if (!outbox.length && await act(event, kind, gid)) return true;
+      outbox.push({ event, kind, gid });   // 前面還有沒送出的就排在後面，維持順序
+      return false;
+    });
+    tail = run;
+    return run;
   }
   let flushing = null;   // 同時只跑一個補送，免得兩個輪詢一起 shift 掉還沒送出的動作
   function flush() {
