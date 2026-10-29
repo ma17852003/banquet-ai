@@ -43,7 +43,7 @@
   .next .pron b.unsure { text-decoration: underline dashed var(--text-dim); text-underline-offset: .3em; }   /* 唸法未確認＝虛線 */
   .unsure-tag { display: inline-flex; align-items: center; gap: .4vw; font-size: var(--min); color: var(--text-dim); border: 1px solid var(--text-dim); border-radius: var(--r-pill); padding: .2vw .9vw; }
   .acts { display: flex; gap: 1.2vw; padding-top: 1.2vw; }
-  .acts button { min-height: max(64px, 4.6vw); padding: 0 2vw; border-radius: 12px; font-size: var(--min); font-weight: 700; display: inline-flex; align-items: center; gap: .6vw;
+  .acts button { min-height: max(64px, 4.6vw); padding: 0 2vw; border-radius: 12px; font-size: var(--min); font-weight: 700; display: inline-flex; align-items: center; gap: .6vw; white-space: nowrap;   /* 文字和（空白鍵）是兩段，不准各自折行 */
                  border: 2px solid var(--line); background: transparent; color: var(--text); }
   .acts .done { background: var(--text); color: var(--bg); border-color: var(--text); flex: 1; justify-content: center; }
   .empty { margin: auto 0; text-align: center; }
