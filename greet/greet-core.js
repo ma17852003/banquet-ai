@@ -86,15 +86,21 @@
     const all = state.guests.map(g => Object.assign({}, g, state.st[g.gid] || { state: "waiting" }));
     const line = all.filter(g => g.state === "arrived").sort((a, b) => a.order - b.order || a.seq - b.seq);
     const next = line.find(g => g.gid === pinned) || line[0] || null;
+    const rs = g => g.readSeq == null ? Infinity : g.readSeq;
     const preempt = next && line[0] && line[0].gid !== next.gid && line[0].order < next.order ? line[0] : null;
     return {
       next, preempt,
       queue: line.filter(g => g !== next),
       pendingVip: all.filter(g => g.vip && g.state === "waiting").sort((a, b) => a.order - b.order),
-      done: all.filter(g => g.state === "read").sort((a, b) => b.readSeq - a.readSeq),
+      done: all.filter(g => g.state === "read").sort((a, b) => rs(b) - rs(a) || 0),   // 沒有 readSeq＝剛按、還沒確認，排最前
       counts: { arrived: all.filter(g => g.state === "arrived" || g.state === "read").length,
                 read: all.filter(g => g.state === "read").length, waiting: line.length }
     };
+  }
+
+  // 主持人照念的一句：「讓我們歡迎 {頭銜・單位} {名字}」，畫面把名字放最大
+  function hostScript(g) {
+    return { who: [g.title, g.org].filter(Boolean).join("・"), name: g.zh || g.en || "" };
   }
 
   function search(guests, q) {
@@ -166,5 +172,5 @@
   // 名單是人貼進來的：畫面上一律跳脫，免得名字裡的 < > 把頁面弄壞
   const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
-  window.GR = { parseList, foldState, hostView, search, hhmm, normEvent, esc, DEMO, fetchState, act, actOrQueue, flush, queued, saveList, resetEvent };
+  window.GR = { parseList, foldState, hostView, hostScript, search, hhmm, normEvent, esc, DEMO, fetchState, act, actOrQueue, flush, queued, saveList, resetEvent };
 })();
